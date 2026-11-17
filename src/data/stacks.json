@@ -1,0 +1,19 @@
+[
+  {
+    "id": "all3",
+    "name": "Alle 3 (Standard-Qty)",
+    "legs": [
+      { "strategyId": "qorb_jn", "qty": 3 },
+      { "strategyId": "omega_es", "qty": 1 },
+      { "strategyId": "omega_rty", "qty": 3 }
+    ]
+  },
+  {
+    "id": "omega_es_rty",
+    "name": "Omega ES + RTY",
+    "legs": [
+      { "strategyId": "omega_es", "qty": 1 },
+      { "strategyId": "omega_rty", "qty": 3 }
+    ]
+  }
+]

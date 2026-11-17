@@ -1,0 +1,32 @@
+[
+  {
+    "id": "qorb_jn",
+    "name": "QORB JN",
+    "instrument": "MNQ",
+    "pointValue": 2,
+    "defaultQty": 3,
+    "costPerContract": 2,
+    "file": "qorb_jn.csv",
+    "notes": "Export qorb_jn-backtest-trades-2026-10-21T02-23-48-755Z-rebuilt.csv"
+  },
+  {
+    "id": "omega_es",
+    "name": "Omega ES (DC on, medium-low)",
+    "instrument": "MES",
+    "pointValue": 5,
+    "defaultQty": 1,
+    "costPerContract": 2,
+    "file": "omega_es.csv",
+    "notes": "Export omega_es_default_dc_on_medum_low-backtest-trades-2026-10-21T02-25-35-929Z-rebuilt.csv"
+  },
+  {
+    "id": "omega_rty",
+    "name": "Omega RTY",
+    "instrument": "M2K",
+    "pointValue": 5,
+    "defaultQty": 3,
+    "costPerContract": 2,
+    "file": "omega_rty.csv",
+    "notes": "Export omega_rty_default-backtest-trades-2026-10-21T02-32-24-248Z-rebuilt.csv"
+  }
+]
