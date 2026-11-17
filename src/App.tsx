@@ -4,11 +4,12 @@ import type { Period } from './core/types'
 import { Overview } from './components/Overview'
 import { Detail } from './components/Detail'
 import { StackBuilder } from './components/StackBuilder'
+import { AccountSim } from './components/AccountSim'
 import { buildItems, useMetrics } from './model'
 import { usePersistent, useUserStacks } from './store'
 import { fmtDate } from './format'
 
-type Tab = 'overview' | 'builder'
+type Tab = 'overview' | 'builder' | 'sim'
 type Preset = 'ytd' | 'prev' | 'all' | 'custom'
 
 const RANGE = dataRange()
@@ -58,7 +59,7 @@ export default function App() {
           <button className={tab === 'builder' ? 'tab active' : 'tab'} onClick={() => setTab('builder')}>
             Stack-Builder
           </button>
-          <button className="tab" disabled title="Kommt in Phase 3">
+          <button className={tab === 'sim' ? 'tab active' : 'tab'} onClick={() => setTab('sim')}>
             Account-Simulation
           </button>
         </nav>
@@ -101,6 +102,7 @@ export default function App() {
             onImport={(list) => setStacks((prev) => [...prev.filter((p) => !list.some((l) => l.id === p.id)), ...list])}
           />
         )}
+        {tab === 'sim' && <AccountSim items={items} period={period} />}
       </main>
     </div>
   )

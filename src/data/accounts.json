@@ -1,0 +1,11 @@
+[
+  {
+    "id": "acc25k",
+    "name": "25K · 1.250 Target · 1.000 DD · 3.000 Buffer",
+    "startBalance": 25000,
+    "profitTarget": 1250,
+    "maxDrawdown": 1000,
+    "bufferTarget": 3000,
+    "cost": 100
+  }
+]

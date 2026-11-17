@@ -318,3 +318,41 @@ table.grid {
 .legs {
   max-width: 560px;
 }
+
+.sim {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sim-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.field input[type='number'] {
+  width: 130px;
+  color: var(--text);
+}
+.field select {
+  color: var(--text);
+  max-width: 100%;
+}
+.field.wide {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.row-actions.bottom {
+  align-self: flex-end;
+}
+.grid tr.selected td {
+  background: var(--accent-soft);
+}

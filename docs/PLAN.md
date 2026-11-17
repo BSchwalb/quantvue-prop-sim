@@ -17,12 +17,12 @@ Ziel: QuantVue-Backtests (einzeln und als Stacks) auswerten und simulieren, wie 
 - Detailansicht mit Equity-, Drawdown- und Monatschart
 - Stack-Builder: Algos wählen, Qty pro Algo, Live-Kennzahlen, speichern im Browser, Export/Import JSON
 
-## Phase 3 – Prop-Account-Simulation (historisch)
+## Phase 3 – Prop-Account-Simulation (historisch) ✅
 Account-Vorlage: Profit Target, Max DD (trailing), Buffer-Ziel, Kosten.
-1. **Evaluation**: Start bei Startbalance, Trailing DD; bestanden sobald Target erreicht → an diesem Tag kein weiterer Trade.
+1. **Evaluation**: Start bei Startbalance, Trailing DD (trailt bis zum Bestehen, kein Einfrieren); bestanden sobald Target erreicht → an diesem Tag kein weiterer Trade.
 2. **Freischaufeln** (nächster Handelstag): Neustart bei Startbalance, Trailing DD, der bei Startbalance einfriert, sobald Höchststand ≥ Start + DD. Freigeschaltet bei Start + Buffer-Ziel.
 3. Verloren oder freigeschaltet → am nächsten Handelstag neuer Account. Freigeschaltete Accounts → Portfolio.
-- Trailing-Modus wählbar: realisierter Höchststand (Standard) / End-of-Day / intraday inkl. MFE
+- Trailing basiert auf End-of-Day-Balance; Verletzung wird intraday inkl. offener Verluste (MAE) geprüft. Intraday-Trailing (MFE) später als Option
 - Ausgabe: Account-Zeitleiste, freigeschaltete Accounts pro Monat/Jahr, Ø Tage bis Freischaltung, Kosten pro freigeschaltetem Account, Bestehensquoten je Phase
 - Rollierender Start: Simulation ab jedem historischen Handelstag
 
