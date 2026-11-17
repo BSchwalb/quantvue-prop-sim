@@ -38,5 +38,25 @@
     "costPerContract": 2,
     "file": "bubbagump_3.csv",
     "notes": "Export 942b61bf-29-rebuilt.csv"
+  },
+  {
+    "id": "profandy_qorb_deadeye",
+    "name": "ProfAndy_QORB Deadeye (NO Compression) OG Version",
+    "instrument": "MNQ",
+    "pointValue": 2,
+    "defaultQty": 1,
+    "costPerContract": 2,
+    "file": "profandy_qorb_deadeye.csv",
+    "notes": "Export 57b4d699-qorb-backtest-trades-2026-11-13T21-42-26-953Z.csv"
+  },
+  {
+    "id": "profandy_optimus_zeus_prime",
+    "name": "ProfAndy_Optimus_Zeus_Prime",
+    "instrument": "RTY",
+    "pointValue": 50,
+    "defaultQty": 1,
+    "costPerContract": 2,
+    "file": "profandy_optimus_zeus_prime.csv",
+    "notes": "Export 284ea1a8-RTY_Optimus_Zeus_V2qzeus-backtest-trades-2026-11-14T05-08-37-008Z.csv"
   }
 ]
