@@ -1,27 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
-import builtinAccounts from '../data/accounts.json'
-import { buildSteps, groupByDay, scaleLegs, type DaySteps } from '../core/equity'
 import { rollingStarts, simulateCampaign, summarize, type AccountRules, type AccountRun, type CampaignSummary, type RollingSummary } from '../core/prop'
-import { dataRange, library } from '../core/registry'
+import { dataRange } from '../core/registry'
 import type { Leg, Period } from '../core/types'
+import type { AccountRulesState } from '../accounts'
+import { SimSetup } from './SimSetup'
 import { fmtDate, num2, pct, usd } from '../format'
-import { shortLegLabel, type Item } from '../model'
-import { usePersistent } from '../store'
-
-const BUILTIN: AccountRules[] = (builtinAccounts as AccountRules[]).map((a) => ({ ...a, builtin: true }))
-
-const daysCache = new Map<string, DaySteps[]>()
-/** Handelstage über den gesamten Backtest (für Simulation über das Zeitraum-Ende hinaus beim rollierenden Start) */
-export function daysFor(legs: Leg[]): DaySteps[] {
-  const key = JSON.stringify(legs)
-  let d = daysCache.get(key)
-  if (!d) {
-    d = groupByDay(buildSteps(scaleLegs(library, legs)))
-    daysCache.set(key, d)
-  }
-  return d
-}
+import { daysFor, shortLegLabel, type Item } from '../model'
 
 function runFor(legs: Leg[], rules: AccountRules, period: Period): { sum: CampaignSummary; roll: RollingSummary } {
   const all = daysFor(legs)
@@ -42,101 +27,30 @@ const days = (n: number | null) => (n === null ? '–' : `${Math.round(n)} T`)
 interface Props {
   items: Item[]
   period: Period
+  item: Item
+  setItemKey: (k: string) => void
+  acc: AccountRulesState
 }
 
-export function AccountSim({ items, period }: Props) {
-  const [userAccounts, setUserAccounts] = usePersistent<AccountRules[]>('qps.accounts', [])
-  const accounts = useMemo(() => [...BUILTIN, ...userAccounts], [userAccounts])
-  const [accId, setAccId] = usePersistent<string>('qps.accId', BUILTIN[0].id)
-  const [itemKey, setItemKey] = usePersistent<string>('qps.simItem', items[0]?.key ?? '')
-  const base = accounts.find((a) => a.id === accId) ?? accounts[0]
-  const [rules, setRules] = useState<AccountRules>(base)
-  const dirty = JSON.stringify({ ...rules, builtin: undefined }) !== JSON.stringify({ ...base, builtin: undefined })
-
-  const item = items.find((i) => i.key === itemKey) ?? items[0]
+export function AccountSim({ items, period, item, setItemKey, acc }: Props) {
+  const { rules } = acc
   const { sum, roll } = useMemo(() => runFor(item.legs, rules, period), [item, rules, period])
   const compare = useMemo(
     () => items.map((it) => ({ it, ...runFor(it.legs, rules, period) })).sort((a, b) => b.sum.unlocksPerMonth - a.sum.unlocksPerMonth),
     [items, rules, period],
   )
 
-  const pickAccount = (id: string) => {
-    setAccId(id)
-    const a = accounts.find((x) => x.id === id)
-    if (a) setRules(a)
-  }
-  const field = (k: keyof AccountRules, label: string) => (
-    <label className="field">
-      <span>{label}</span>
-      <input type="number" value={rules[k] as number} onChange={(e) => setRules({ ...rules, [k]: Number(e.target.value) || 0 })} />
-    </label>
-  )
-  const saveAsNew = () => {
-    const a = { ...rules, id: 'a' + Date.now().toString(36), builtin: undefined }
-    a.name = `${Math.round(a.startBalance / 1000)}K · ${a.profitTarget} Target · ${a.maxDrawdown} DD · ${a.bufferTarget} Buffer · $${a.cost}`
-    setUserAccounts([...userAccounts, a])
-    setAccId(a.id)
-    setRules(a)
-  }
-  const saveExisting = () => setUserAccounts(userAccounts.map((u) => (u.id === rules.id ? { ...rules } : u)))
-  const del = () => {
-    setUserAccounts(userAccounts.filter((u) => u.id !== base.id))
-    pickAccount(BUILTIN[0].id)
-  }
-
   const rollChart = roll.points.map((p) => ({ day: p.startDay, days: p.days, fail: p.days === null ? 0 : null }))
 
   return (
     <div className="sim">
-      <div className="card sim-setup">
-        <div className="sim-row">
-          <label className="field wide">
-            <span>Strategie / Stack</span>
-            <select value={item.key} onChange={(e) => setItemKey(e.target.value)}>
-              {items.map((it) => (
-                <option key={it.key} value={it.key}>
-                  {it.kind === 'stack' ? 'Stack: ' : ''}
-                  {it.name} ({it.legs.map(shortLegLabel).join(' + ')})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field wide">
-            <span>Account-Vorlage</span>
-            <select value={base.id} onChange={(e) => pickAccount(e.target.value)}>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.builtin ? '' : ' (eigene)'}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="sim-row">
-          {field('startBalance', 'Startbalance')}
-          {field('profitTarget', 'Profit Target')}
-          {field('maxDrawdown', 'Max DD (trailing)')}
-          {field('bufferTarget', 'Freigeschaltet bei Gewinn')}
-          {field('cost', 'Kosten / Account')}
-          <div className="row-actions bottom">
-            <button className="ghost" onClick={saveAsNew}>
-              Als Vorlage speichern
-            </button>
-            {!base.builtin && dirty && <button onClick={saveExisting}>Änderungen speichern</button>}
-            {!base.builtin && (
-              <button className="ghost danger" onClick={del}>
-                Löschen
-              </button>
-            )}
-          </div>
-        </div>
+      <SimSetup items={items} item={item} setItemKey={setItemKey} acc={acc}>
         <p className="hint">
           Zeitraum {fmtDate(period.from)} – {fmtDate(period.to)} (oben rechts änderbar). Evaluation: Grenze = EOD-Höchststand − {usd(rules.maxDrawdown)}, trailt bis
           zum Bestehen. Freischaufeln: Neustart bei {usd(rules.startBalance)}, Grenze trailt bis {usd(rules.startBalance)} und bleibt dort. Verletzt wird die
           Grenze intraday inkl. offener Verluste. Nach Ziel oder Verlust wird an diesem Tag nicht weitergehandelt; neuer Account am nächsten Handelstag.
         </p>
-      </div>
+      </SimSetup>
 
       <div className="card">
         <h2>Historischer Durchlauf ab {fmtDate(period.from)}</h2>

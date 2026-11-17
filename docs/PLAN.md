@@ -26,8 +26,11 @@ Account-Vorlage: Profit Target, Max DD (trailing), Buffer-Ziel, Kosten.
 - Ausgabe: Account-Zeitleiste, freigeschaltete Accounts pro Monat/Jahr, Ø Tage bis Freischaltung, Kosten pro freigeschaltetem Account, Bestehensquoten je Phase
 - Rollierender Start: Simulation ab jedem historischen Handelstag
 
-## Phase 4 – Monte Carlo
-- Neu ziehen ganzer Handelstage (erhält Gleichzeitigkeit der Algos im Stack), N synthetische Jahre mit festem Seed
+## Phase 4 – Monte Carlo ✅
+- Pool = alle Werktage im gewählten Zeitraum (inkl. Tage ohne Trades)
+- Methoden: Tage ziehen mit Zurücklegen (1 Jahr = 261 Werktage) oder Tage neu mischen (Gesamtgewinn bleibt gleich)
+- Ganze Handelstage werden gezogen (erhält Gleichzeitigkeit der Algos im Stack); alle Algos/Stacks laufen auf denselben Ziehungen
+- Kein Speichern nötig: fester Seed → reproduzierbare Ziehungen, Berechnung dauert < 1 s
 - Wahrscheinlichkeiten und Verteilungen (Median, P10/P90) für Kosten, Dauer, Accounts pro Jahr
 - Vergleich/Ranking von Algos und Stacks für die Account-Strategie
 

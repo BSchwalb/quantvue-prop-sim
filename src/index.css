@@ -356,3 +356,14 @@ table.grid {
 .grid tr.selected td {
   background: var(--accent-soft);
 }
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}

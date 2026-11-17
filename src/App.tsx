@@ -5,11 +5,13 @@ import { Overview } from './components/Overview'
 import { Detail } from './components/Detail'
 import { StackBuilder } from './components/StackBuilder'
 import { AccountSim } from './components/AccountSim'
+import { MonteCarlo } from './components/MonteCarlo'
+import { useAccountRules } from './accounts'
 import { buildItems, useMetrics } from './model'
 import { usePersistent, useUserStacks } from './store'
 import { fmtDate } from './format'
 
-type Tab = 'overview' | 'builder' | 'sim'
+type Tab = 'overview' | 'builder' | 'sim' | 'mc'
 type Preset = 'ytd' | 'prev' | 'all' | 'custom'
 
 const RANGE = dataRange()
@@ -36,12 +38,16 @@ export default function App() {
   const [qtyOverrides, setQtyOverrides] = usePersistent<Record<string, number>>('qps.qty', {})
   const { stacks: userStacks, setStacks, save, remove } = useUserStacks()
   const [selected, setSelected] = useState<string | null>(null)
+  const acc = useAccountRules()
+  const [simItemKey, setSimItemKey] = usePersistent<string>('qps.simItem', '')
 
   const period = useMemo(() => presetPeriod(preset, custom), [preset, custom])
   const allStacks = useMemo(() => [...BUILTIN_STACKS, ...userStacks], [userStacks])
   const items = useMemo(() => buildItems(qtyOverrides, allStacks), [qtyOverrides, allStacks])
   const metrics = useMetrics(items, period)
   const selItem = items.find((i) => i.key === selected)
+  const simItem = items.find((i) => i.key === simItemKey) ?? items[0]
+  const simProps = { items, period, item: simItem, setItemKey: setSimItemKey, acc }
 
   return (
     <div className="app">
@@ -61,6 +67,9 @@ export default function App() {
           </button>
           <button className={tab === 'sim' ? 'tab active' : 'tab'} onClick={() => setTab('sim')}>
             Account-Simulation
+          </button>
+          <button className={tab === 'mc' ? 'tab active' : 'tab'} onClick={() => setTab('mc')}>
+            Monte Carlo
           </button>
         </nav>
         <div className="period">
@@ -102,7 +111,8 @@ export default function App() {
             onImport={(list) => setStacks((prev) => [...prev.filter((p) => !list.some((l) => l.id === p.id)), ...list])}
           />
         )}
-        {tab === 'sim' && <AccountSim items={items} period={period} />}
+        {tab === 'sim' && <AccountSim {...simProps} />}
+        {tab === 'mc' && <MonteCarlo {...simProps} />}
       </main>
     </div>
   )

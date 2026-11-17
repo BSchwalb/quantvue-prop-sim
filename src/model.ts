@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { scaleLegs } from './core/equity'
+import { buildSteps, groupByDay, scaleLegs, type DaySteps } from './core/equity'
 import { computeMetrics, type Metrics } from './core/metrics'
 import { library } from './core/registry'
 import type { Leg, Period, Stack } from './core/types'
@@ -43,4 +43,16 @@ export function useMetrics(items: Item[], period: Period): Map<string, Metrics> 
     for (const it of items) map.set(it.key, metricsFor(it.legs, period))
     return map
   }, [items, period])
+}
+
+const daysCache = new Map<string, DaySteps[]>()
+/** Handelstage (DaySteps) über den gesamten Backtest, gecacht pro Leg-Kombination */
+export function daysFor(legs: Leg[]): DaySteps[] {
+  const key = JSON.stringify(legs)
+  let d = daysCache.get(key)
+  if (!d) {
+    d = groupByDay(buildSteps(scaleLegs(library, legs)))
+    daysCache.set(key, d)
+  }
+  return d
 }
