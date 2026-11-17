@@ -28,5 +28,15 @@
     "costPerContract": 2,
     "file": "omega_rty.csv",
     "notes": "Export omega_rty_default-backtest-trades-2026-10-21T02-32-24-248Z-rebuilt.csv"
+  },
+  {
+    "id": "bubbagump_3",
+    "name": "BubbaGump 3",
+    "instrument": "M2K",
+    "pointValue": 5,
+    "defaultQty": 1,
+    "costPerContract": 2,
+    "file": "bubbagump_3.csv",
+    "notes": "Export 942b61bf-29-rebuilt.csv"
   }
 ]

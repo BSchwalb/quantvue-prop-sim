@@ -69,8 +69,9 @@ export function computeMetrics(trades: ScaledTrade[], period: Period): Metrics {
       grossLoss -= t.pnl
       if (t.pnl < 0) maxStreak = Math.max(maxStreak, ++streak)
     }
-    byDay.set(t.day, (byDay.get(t.day) ?? 0) + t.pnl)
-    const m = t.day.slice(0, 7)
+    // Gewinn/Verlust wird am Ausstiegstag realisiert
+    byDay.set(t.exitDay, (byDay.get(t.exitDay) ?? 0) + t.pnl)
+    const m = t.exitDay.slice(0, 7)
     const row = byMonth.get(m) ?? { month: m, pnl: 0, trades: 0 }
     row.pnl += t.pnl
     row.trades++

@@ -33,6 +33,7 @@ export function parseBacktestCsv(strategyId: string, csv: string): RawTrade[] {
       entryT,
       exitT,
       day: r.entry_date.slice(0, 10),
+      exitDay: r.exit_date.slice(0, 10),
       pnlPoints: num(r.pnl_points),
       maePoints: Math.min(0, num(r.mae)),
       mfePoints: Math.max(0, num(r.mfe)),

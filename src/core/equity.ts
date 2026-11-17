@@ -22,6 +22,7 @@ export function scaleLegs(lib: Library, legs: Leg[], period?: Period): ScaledTra
         entryT: t.entryT,
         exitT: t.exitT,
         day: t.day,
+        exitDay: t.exitDay,
         pnl,
         // Kosten fallen spätestens beim Exit an -> konservativ schon im MAE berücksichtigen
         mae: Math.min(t.maePoints * k - cost, pnl),
@@ -65,7 +66,8 @@ export function buildSteps(trades: ScaledTrade[]): Step[] {
       lo += o.mae
       hi += o.mfe
     }
-    steps.push({ t: e.t, day: e.tr.day, close: bal, low: bal + lo, high: bal + hi })
+    // Einstieg zählt zum Einstiegstag, Ausstieg (Realisierung) zum Ausstiegstag
+    steps.push({ t: e.t, day: e.open ? e.tr.day : e.tr.exitDay, close: bal, low: bal + lo, high: bal + hi })
   }
   return steps
 }

@@ -23,8 +23,10 @@ export interface RawTrade {
   /** Minuten seit Epoch (Exchange-Lokalzeit als UTC behandelt) */
   entryT: number
   exitT: number
-  /** YYYY-MM-DD */
+  /** Einstiegstag YYYY-MM-DD */
   day: string
+  /** Ausstiegstag YYYY-MM-DD (bei Trades über Nacht ≠ day) */
+  exitDay: string
   pnlPoints: number
   maePoints: number
   mfePoints: number
@@ -50,7 +52,10 @@ export interface ScaledTrade {
   strategyId: string
   entryT: number
   exitT: number
+  /** Einstiegstag */
   day: string
+  /** Ausstiegstag – hier wird der Gewinn/Verlust realisiert */
+  exitDay: string
   pnl: number
   mae: number
   mfe: number

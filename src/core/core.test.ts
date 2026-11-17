@@ -6,7 +6,7 @@ import type { RawTrade, ScaledTrade } from './types'
 
 const tr = (day: string, entryMin: number, exitMin: number, pnl: number, mae: number, mfe = 0): ScaledTrade => {
   const base = Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10)) / 60000
-  return { strategyId: 'x', entryT: base + entryMin, exitT: base + exitMin, day, pnl, mae, mfe, win: pnl > 0 }
+  return { strategyId: 'x', entryT: base + entryMin, exitT: base + exitMin, day, exitDay: day, pnl, mae, mfe, win: pnl > 0 }
 }
 
 describe('buildSteps', () => {
@@ -42,7 +42,7 @@ describe('scaleLegs', () => {
   it('skaliert mit Qty, $/Punkt und Kosten', () => {
     const raw: RawTrade = {
       strategyId: 's', index: 1, direction: 'long', entryT: 0, exitT: 5, day: '2026-01-02',
-      pnlPoints: 10, maePoints: -4, mfePoints: 12, exitReason: 'tp',
+      exitDay: '2026-01-02', pnlPoints: 10, maePoints: -4, mfePoints: 12, exitReason: 'tp',
     }
     const lib: Library = {
       meta: { s: { id: 's', name: 's', instrument: 'MNQ', pointValue: 2, defaultQty: 1, costPerContract: 2, file: '' } },
@@ -64,9 +64,21 @@ describe('groupByDay', () => {
   })
 })
 
+describe('Trades über Nacht', () => {
+  it('werden am Ausstiegstag realisiert', () => {
+    const t = tr('2026-01-05', 600, 600 + 20 * 60, 80, -30) // Ausstieg am nächsten Tag
+    t.exitDay = '2026-01-06'
+    const days = groupByDay(buildSteps([tr('2026-01-05', 540, 560, 10, -5), t]))
+    expect(days.map((d) => d.day)).toEqual(['2026-01-05', '2026-01-06'])
+    expect(days[0].pnl).toBe(10) // offener Trade nicht im EOD-Saldo
+    expect(days[0].steps.at(-1)!.low).toBe(10 - 30) // offener Buchverlust zählt aber intraday
+    expect(days[1].pnl).toBe(80)
+  })
+})
+
 describe('echte Backtests', () => {
   it('sind geladen', () => {
-    expect(Object.keys(library.meta).sort()).toEqual(['omega_es', 'omega_rty', 'qorb_jn'])
+    expect(Object.keys(library.meta).sort()).toEqual(['bubbagump_3', 'omega_es', 'omega_rty', 'qorb_jn'])
     expect(library.trades.qorb_jn.length).toBe(326)
   })
 })
