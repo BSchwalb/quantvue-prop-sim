@@ -229,6 +229,11 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
             <small>Median · 80 % zwischen {range(mc.netProfit.p10, mc.netProfit.p90, usd)}</small>
           </div>
           <div className="kpi">
+            <span>Ø Gewinn pro Monat</span>
+            <b>{usd(mc.netProfit.mean / mc.months)}</b>
+            <small>Median {usd(mc.netProfit.p50 / mc.months)} · 80 % zwischen {range(mc.netProfit.p10 / mc.months, mc.netProfit.p90 / mc.months, usd)}</small>
+          </div>
+          <div className="kpi">
             <span>Max DD pro {yearLabel}</span>
             <b>{usd(mc.maxDrawdown.p50)}</b>
             <small>Median · 80 % zwischen {range(mc.maxDrawdown.p10, mc.maxDrawdown.p90, usd)}</small>
