@@ -52,10 +52,10 @@
   {
     "id": "profandy_optimus_zeus_prime",
     "name": "ProfAndy_Optimus_Zeus_Prime",
-    "instrument": "RTY",
-    "pointValue": 50,
-    "defaultQty": 1,
-    "costPerContract": 20,
+    "instrument": "M2K",
+    "pointValue": 5,
+    "defaultQty": 10,
+    "costPerContract": 2,
     "file": "profandy_optimus_zeus_prime.csv",
     "notes": "Export 284ea1a8-RTY_Optimus_Zeus_V2qzeus-backtest-trades-2026-11-14T05-08-37-008Z.csv"
   }
