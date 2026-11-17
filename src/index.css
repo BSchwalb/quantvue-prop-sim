@@ -10,6 +10,7 @@
   --pos: #15803d;
   --neg: #c2410c;
   --key-bg: #fff7e0;
+  --violet: #7c3aed;
   color-scheme: light;
 }
 
@@ -26,6 +27,7 @@
     --pos: #4ade80;
     --neg: #fb923c;
     --key-bg: #2d2817;
+    --violet: #a78bfa;
     color-scheme: dark;
   }
 }
@@ -388,4 +390,52 @@ table.grid {
 .leg-field.changed span:first-child {
   color: var(--accent);
   font-weight: 600;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+.legend i.dash {
+  background: repeating-linear-gradient(90deg, var(--neg) 0 4px, transparent 4px 7px);
+}
+.legend i.dot {
+  border-radius: 50%;
+  background: var(--pos);
+}
+.legend i.dot.small {
+  width: 9px;
+  height: 9px;
+}
+.legend i.dot.big {
+  width: 15px;
+  height: 15px;
+}
+.legend i.dot.lost {
+  width: 9px;
+  height: 9px;
+  background: var(--neg);
+}
+.chart-tip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
 }

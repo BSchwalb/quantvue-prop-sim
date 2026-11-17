@@ -1,18 +1,20 @@
 import { useMemo } from 'react'
 import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
-import { rollingStarts, simulateCampaign, summarize, type AccountRules, type AccountRun, type CampaignSummary, type RollingSummary } from '../core/prop'
+import { rollingStarts, simulateCampaign, summarize, type AccountRules, type AccountRun, type CampaignSummary, type RollingSummary, type TraceRow } from '../core/prop'
 import { dataRange } from '../core/registry'
 import type { Leg, Period } from '../core/types'
 import type { AccountRulesState } from '../accounts'
 import { SimSetup } from './SimSetup'
+import { AccountEquity } from './AccountEquity'
 import { fmtDate, num2, pct, usd } from '../format'
 import { daysFor, shortLegLabel, type Item } from '../model'
 
-function runFor(legs: Leg[], rules: AccountRules, period: Period): { sum: CampaignSummary; roll: RollingSummary } {
+function runFor(legs: Leg[], rules: AccountRules, period: Period, withTrace = false): { sum: CampaignSummary; roll: RollingSummary; trace: TraceRow[] } {
   const all = daysFor(legs)
   const inPeriod = all.filter((d) => d.day >= period.from && d.day <= period.to)
-  const runs = simulateCampaign(inPeriod, rules)
-  return { sum: summarize(runs, rules, period.from, period.to), roll: rollingStarts(all, rules, period.from, period.to) }
+  const trace: TraceRow[] = []
+  const runs = simulateCampaign(inPeriod, rules, withTrace ? { trace } : {})
+  return { sum: summarize(runs, rules, period.from, period.to), roll: rollingStarts(all, rules, period.from, period.to), trace }
 }
 
 const OUTCOME: Record<AccountRun['outcome'], { label: string; cls: string }> = {
@@ -34,7 +36,7 @@ interface Props {
 
 export function AccountSim({ items, period, item, setItemKey, acc }: Props) {
   const { rules } = acc
-  const { sum, roll } = useMemo(() => runFor(item.legs, rules, period), [item, rules, period])
+  const { sum, roll, trace } = useMemo(() => runFor(item.legs, rules, period, true), [item, rules, period])
   const compare = useMemo(
     () => items.map((it) => ({ it, ...runFor(it.legs, rules, period) })).sort((a, b) => b.sum.unlocksPerMonth - a.sum.unlocksPerMonth),
     [items, rules, period],
@@ -86,6 +88,8 @@ export function AccountSim({ items, period, item, setItemKey, acc }: Props) {
             </small>
           </div>
         </div>
+
+        <AccountEquity trace={trace} rules={rules} />
 
         <h3>Accounts</h3>
         <div className="table-wrap">

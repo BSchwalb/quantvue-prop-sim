@@ -74,6 +74,23 @@ describe('simulateCampaign', () => {
   })
 })
 
+describe('trace', () => {
+  it('protokolliert Phasen, Grenze und Ereignisse', () => {
+    const d = dates(4)
+    const days = [day(d[0], 1300), day(d[1], 500), day(d[2], -1200), day(d[3], 100)]
+    const trace: import('./prop').TraceRow[] = []
+    simulateCampaign(days, rules, { trace })
+    expect(trace.map((t) => [t.n, t.phase, t.event])).toEqual([
+      [1, 'eval', 'passed'],
+      [1, 'funded', null],
+      [1, 'funded', 'lost'], // Grenze -500 nach EOD +500
+      [2, 'eval', null],
+    ])
+    expect(trace[2].threshold).toBe(-500)
+    expect(trace[1].bal).toBe(500)
+  })
+})
+
 describe('summarize & rolling', () => {
   it('Zyklen und Kosten', () => {
     const d = dates(8)

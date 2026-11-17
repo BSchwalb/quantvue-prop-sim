@@ -48,12 +48,29 @@ export function threshold(s: State, r: AccountRules): number {
 
 type DayResult = 'none' | 'lost' | 'passed' | 'unlocked'
 
-/** Einen Handelstag für einen Account abspielen. Mutiert state. */
-function runDay(s: State, day: DaySteps, r: AccountRules): DayResult {
+/** Ein Tag im Verlauf eines Accounts (für den Equity-Verlauf in der UI) */
+export interface TraceRow {
+  day: string
+  /** Account-Nummer */
+  n: number
+  phase: 'eval' | 'funded'
+  /** Kontostand relativ zur Startbalance: Tagesende bzw. beim Ereignis */
+  bal: number
+  /** tiefster Stand des Tages inkl. offener Verluste */
+  low: number
+  /** Verlustgrenze an diesem Tag */
+  threshold: number
+  event: 'passed' | 'unlocked' | 'lost' | null
+}
+
+/** Einen Handelstag für einen Account abspielen. Mutiert state; low = tiefster Stand des Tages. */
+function runDay(s: State, day: DaySteps, r: AccountRules, out?: { low: number }): DayResult {
   const thr = threshold(s, r)
   const bal0 = s.bal
   const goal = s.phase === 'eval' ? r.profitTarget : r.bufferTarget
+  if (out) out.low = bal0
   for (const st of day.steps) {
+    if (out) out.low = Math.min(out.low, bal0 + st.low)
     // konservativ: zuerst Tiefpunkt (inkl. offener Verluste) prüfen, dann Ziel
     if (bal0 + st.low <= thr) {
       s.bal = bal0 + st.low
@@ -74,6 +91,8 @@ export interface CampaignOptions {
   startIdx?: number
   /** nach der ersten Freischaltung aufhören */
   stopAfterFirstUnlock?: boolean
+  /** wenn gesetzt, wird jeder Handelstag hier protokolliert */
+  trace?: TraceRow[]
 }
 
 /**
@@ -90,7 +109,19 @@ export function simulateCampaign(days: DaySteps[], r: AccountRules, opts: Campai
     let done = false
     for (; i < days.length; i++) {
       run.tradingDays++
-      const res = runDay(s, days[i], r)
+      const phase = s.phase
+      const thr = threshold(s, r)
+      const out = { low: 0 }
+      const res = runDay(s, days[i], r, out)
+      opts.trace?.push({
+        day: days[i].day,
+        n: run.n,
+        phase,
+        bal: s.bal,
+        low: out.low,
+        threshold: thr,
+        event: res === 'none' ? null : res,
+      })
       if (res === 'lost') {
         run.outcome = s.phase === 'eval' ? 'lost_eval' : 'lost_funded'
         run.endDay = days[i].day
