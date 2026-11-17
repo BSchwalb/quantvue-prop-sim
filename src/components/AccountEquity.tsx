@@ -12,29 +12,42 @@ interface Point {
   passed?: number | null
   unlocked?: number | null
   lost?: number | null
+  /** Ergebnis der Evaluation, auf das das Freischaufeln im Chart aufsetzt */
+  offset?: number
 }
 
-/** Chart-Daten: je Account/Phase ein eigenes Segment, das bei 0 beginnt (Lücke dazwischen) */
+/**
+ * Chart-Daten: ein Segment pro Account, das bei 0 beginnt (Lücke zwischen Accounts).
+ * Nach bestandener Evaluation läuft die Linie ohne Reset weiter: Freischaufeln wird
+ * auf das Evaluationsergebnis aufgesetzt (die Simulation selbst startet die Phase bei 0).
+ */
 function toPoints(trace: TraceRow[]): Point[] {
   const pts: Point[] = []
+  let offset = 0
   trace.forEach((t, i) => {
     const prev = trace[i - 1]
-    if (!prev || prev.n !== t.n || prev.phase !== t.phase) {
-      if (prev) pts.push({ x: i - 0.5, row: prev }) // Lücke
-      const start: Point = { x: i - 0.35, thr: t.threshold, row: t }
-      start[t.phase === 'eval' ? 'evalBal' : 'fundedBal'] = 0
-      pts.push(start)
+    if (!prev || prev.n !== t.n) {
+      offset = 0
+      if (prev) pts.push({ x: i - 0.5, row: prev }) // Lücke zwischen Accounts
+      pts.push({ x: i - 0.35, evalBal: 0, thr: t.threshold, row: t, offset: 0 })
     }
-    pts.push({
+    const v = (t.phase === 'funded' ? offset : 0) + t.bal
+    const pt: Point = {
       x: i,
       row: t,
-      evalBal: t.phase === 'eval' ? t.bal : null,
-      fundedBal: t.phase === 'funded' ? t.bal : null,
-      thr: t.threshold,
-      passed: t.event === 'passed' ? t.bal : null,
-      unlocked: t.event === 'unlocked' ? t.bal : null,
-      lost: t.event === 'lost' ? t.bal : null,
-    })
+      offset: t.phase === 'funded' ? offset : 0,
+      evalBal: t.phase === 'eval' ? v : null,
+      fundedBal: t.phase === 'funded' ? v : null,
+      thr: (t.phase === 'funded' ? offset : 0) + t.threshold,
+      passed: t.event === 'passed' ? v : null,
+      unlocked: t.event === 'unlocked' ? v : null,
+      lost: t.event === 'lost' ? v : null,
+    }
+    if (t.event === 'passed') {
+      offset = t.bal
+      pt.fundedBal = v // Freischaufeln-Linie setzt hier an
+    }
+    pts.push(pt)
   })
   return pts
 }
@@ -50,15 +63,18 @@ const dot =
     )
 
 function TooltipBox({ active, payload }: { active?: boolean; payload?: { payload: Point }[] }) {
-  const row = payload?.[0]?.payload.row
+  const pt = payload?.[0]?.payload
+  const row = pt?.row
   if (!active || !row) return null
+  const off = row.phase === 'funded' ? (pt.offset ?? 0) : 0
   const ev = { passed: 'Evaluation bestanden', unlocked: 'Freigeschaltet', lost: 'Verloren' }
   return (
     <div className="chart-tip">
       <b>{fmtDate(row.day)}</b> · Account #{row.n} · {row.phase === 'eval' ? 'Evaluation' : 'Freischaufeln'}
-      <div>Kontostand: {usd(row.bal)}</div>
-      <div>Tiefpunkt des Tages: {usd(row.low)}</div>
-      <div>Verlustgrenze: {usd(row.threshold)}</div>
+      <div>Verlauf seit Kauf: {usd(off + row.bal)}</div>
+      {row.phase === 'funded' && <div>davon Freischaufeln: {usd(row.bal)}</div>}
+      <div>Tiefpunkt des Tages: {usd(off + row.low)}</div>
+      <div>Verlustgrenze: {usd(off + row.threshold)}</div>
       {row.event && <div className={row.event === 'lost' ? 'neg' : 'pos'}>{ev[row.event]}</div>}
     </div>
   )
@@ -102,7 +118,6 @@ export function AccountEquity({ trace, rules }: { trace: TraceRow[]; rules: Acco
           <Tooltip content={<TooltipBox />} />
           <ReferenceLine y={0} stroke="var(--muted)" strokeOpacity={0.6} />
           <ReferenceLine y={rules.profitTarget} stroke="var(--accent)" strokeDasharray="2 4" strokeOpacity={0.6} />
-          <ReferenceLine y={rules.bufferTarget} stroke="var(--violet)" strokeDasharray="2 4" strokeOpacity={0.6} />
           <Line isAnimationActive={false} dataKey="thr" stroke="var(--neg)" strokeDasharray="5 4" strokeWidth={1.2} dot={false} connectNulls={false} type="stepAfter" />
           <Line isAnimationActive={false} dataKey="evalBal" stroke="var(--accent)" strokeWidth={2} dot={false} connectNulls={false} />
           <Line isAnimationActive={false} dataKey="fundedBal" stroke="var(--violet)" strokeWidth={2} dot={false} connectNulls={false} />
@@ -112,8 +127,9 @@ export function AccountEquity({ trace, rules }: { trace: TraceRow[]; rules: Acco
         </ComposedChart>
       </ResponsiveContainer>
       <p className="hint">
-        Kontostand relativ zur Startbalance (0 = {usd(rules.startBalance)}) am Tagesende bzw. beim Ereignis. Gepunktete Linien: Profit Target ({usd(rules.profitTarget)})
-        und Freischalt-Ziel ({usd(rules.bufferTarget)}). Nach jedem Phasenwechsel bzw. neuen Account startet die Linie wieder bei 0.
+        Verlauf je Account ab Kauf (0 = {usd(rules.startBalance)}), am Tagesende bzw. beim Ereignis. Nach bestandener Evaluation läuft die Linie weiter – das
+        Freischaufeln setzt auf das Evaluationsergebnis auf; freigeschaltet ist der Account bei {usd(rules.bufferTarget)} Gewinn in dieser Phase. Nur bei einem neuen
+        Account (nach Verlust oder Freischaltung) startet die Linie wieder bei 0. Gepunktete Linie: Profit Target der Evaluation ({usd(rules.profitTarget)}).
       </p>
     </>
   )
