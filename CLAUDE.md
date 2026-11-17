@@ -9,7 +9,8 @@ Sprache der App und der Kommunikation: Deutsch.
    - Instrument (z. B. MNQ, MES, M2K, NQ, ES …)
    - Kontraktzahl (Standard-Qty), mit der der Algo gehandelt wird
    - Name/Bezeichnung, falls aus dem Dateinamen nicht eindeutig
-   - Kosten: Standard $2 pro Kontrakt und Roundtrip (inkl. Slippage), außer der User sagt etwas anderes
+   - Kosten pro Kontrakt und Roundtrip inkl. Slippage: **Micro $2, Mini $20** (Import-Skript setzt das automatisch), außer der User sagt etwas anderes
+   - Bei Mini vs. Micro (z. B. RTY vs. M2K) im Zweifel nachfragen
 2. Import:
    ```bash
    node scripts/import-backtest.mjs --file <upload.csv> --id <id> --name "<Name>" --instrument MNQ --qty 3

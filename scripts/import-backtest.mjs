@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Importiert einen QuantVue-Backtest-Export ins Repo.
 // Nutzung:
-//   node scripts/import-backtest.mjs --file <pfad.csv> --id <id> --name "<Name>" --instrument MNQ --qty 3 [--cost 2] [--pointValue 2]
+//   node scripts/import-backtest.mjs --file <pfad.csv> --id <id> --name "<Name>" --instrument MNQ --qty 3 [--cost <$ pro Kontrakt, Standard: Micro 2 / Mini 20>] [--pointValue 2]
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const POINT_VALUES = { ES: 50, MES: 5, NQ: 20, MNQ: 2, RTY: 50, M2K: 5, YM: 5, MYM: 0.5, GC: 100, MGC: 10, CL: 1000, MCL: 100 }
+const MICROS = new Set(['MES', 'MNQ', 'M2K', 'MYM', 'MGC', 'MCL'])
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const args = {}
@@ -45,7 +46,8 @@ const entry = {
   instrument,
   pointValue,
   defaultQty: Number(args.qty),
-  costPerContract: Number(args.cost ?? 2),
+  // Standardkosten pro Roundtrip inkl. Slippage: Micro $2, Mini $20
+  costPerContract: Number(args.cost ?? (MICROS.has(instrument) ? 2 : 20)),
   file,
   notes: `Export ${path.basename(args.file)}`,
 }
