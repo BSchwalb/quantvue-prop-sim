@@ -32,5 +32,11 @@ describe('Monte Carlo', () => {
     expect(boot.months).toBeCloseTo(12)
     expect(boot.paths).toHaveLength(50)
     expect(boot.netProfit.p10).toBeLessThan(boot.netProfit.p90)
+
+    // Zyklen: jede Freischaltung startet einen neuen Zyklus bei 0
+    for (const p of boot.paths) {
+      expect(p.cycleDays).toHaveLength(p.unlocks)
+      expect(p.cycleDays.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(p.calendarDays)
+    }
   })
 })

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { AccountRulesState } from '../accounts'
 import { businessDays, dist, drawPaths, runMonteCarlo, type McMode, type McResult } from '../core/montecarlo'
@@ -6,6 +6,7 @@ import type { AccountRules } from '../core/prop'
 import type { Period } from '../core/types'
 import { fmtDate, num2, pct, ratio, usd } from '../format'
 import { daysFor, shortLegLabel, type Item } from '../model'
+import { library } from '../core/registry'
 import { usePersistent } from '../store'
 import { SimSetup } from './SimSetup'
 
@@ -31,6 +32,8 @@ function mcFor(item: Item, pool: string[], paths: number[][], rules: AccountRule
 const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }
 const range = (a: number, b: number, f: (n: number) => string) => `${f(a)} – ${f(b)}`
 const d0 = (n: number) => `${Math.round(n)} T`
+/** Tage pro Freischaltung – sehr seltene Freischaltungen nicht als absurde Zahl anzeigen */
+const dpu = (n: number | null) => (n === null ? '–' : n > 730 ? '> 2 Jahre' : d0(n))
 const n1 = (n: number) => num2(n).replace(/,00$/, '')
 
 export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
@@ -39,22 +42,28 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
 
   const pool = useMemo(() => businessDays(period.from, period.to), [period])
   const paths = useMemo(() => drawPaths(pool.length, cfg.n, cfg.mode, cfg.seed), [pool, cfg])
-  const mc = useMemo(() => mcFor(item, pool, paths, rules), [item, pool, paths, rules])
-  const compare = useMemo(
-    () => items.map((it) => ({ it, r: mcFor(it, pool, paths, rules) })).sort((a, b) => b.r.unlocks.mean - a.r.unlocks.mean),
-    [items, pool, paths, rules],
-  )
+
+  // Temporäre Kontraktzahlen für den gewählten Algo/Stack (werden nicht gespeichert)
+  const [ov, setOv] = useState<{ key: string; qty: Record<string, number> }>({ key: item.key, qty: {} })
+  const qtyOv = ov.key === item.key ? ov.qty : {}
+  const setQty = (id: string, q: number) => setOv({ key: item.key, qty: { ...qtyOv, [id]: q } })
+  const variant = useMemo<Item | null>(() => {
+    const legs = item.legs.map((l) => ({ ...l, qty: qtyOv[l.strategyId] ?? l.qty }))
+    if (legs.every((l, i) => l.qty === item.legs[i].qty) || !legs.some((l) => l.qty > 0)) return null
+    return { ...item, key: item.key + ':mod', name: item.name + ' (angepasst)', legs: legs.filter((l) => l.qty > 0) }
+  }, [item, qtyOv])
+  const active = variant ?? item
+
+  const baseMc = useMemo(() => mcFor(item, pool, paths, rules), [item, pool, paths, rules])
+  const mc = useMemo(() => (variant ? mcFor(variant, pool, paths, rules) : baseMc), [variant, baseMc, pool, paths, rules])
+  const compare = useMemo(() => {
+    const rows = items.map((it) => ({ it, r: mcFor(it, pool, paths, rules) }))
+    if (variant) rows.push({ it: variant, r: mc })
+    return rows.sort((a, b) => b.r.unlocks.mean - a.r.unlocks.mean)
+  }, [items, pool, paths, rules, variant, mc])
 
   const perMonthToDD = useMemo(() => dist(mc.paths.map((p) => (p.maxDrawdown > 0 ? p.netProfit / mc.months / p.maxDrawdown : 0))), [mc])
-  const firstHist = useMemo(() => {
-    const bin = 15
-    const vals = mc.paths.map((p) => p.firstUnlockDays)
-    const maxD = Math.max(0, ...vals.filter((v): v is number => v !== null))
-    const bins = Array.from({ length: Math.floor(maxD / bin) + 1 }, (_, i) => ({ label: `${i * bin}–${i * bin + bin - 1}`, share: 0 }))
-    for (const v of vals) if (v !== null) bins[Math.floor(v / bin)].share += 1 / vals.length
-    bins.push({ label: 'keine', share: vals.filter((v) => v === null).length / Math.max(vals.length, 1) })
-    return bins
-  }, [mc])
+  const cycleHist = mc.cycleHistogram.map((h) => ({ label: `${h.from}–${h.from + 14}`, share: h.share }))
 
   const yearLabel = cfg.mode === 'bootstrap' ? 'Jahr' : `Durchlauf (${num2(mc.months)} Mon.)`
 
@@ -93,8 +102,79 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
       </SimSetup>
 
       <div className="card">
+        <div className="row-head">
+          <h2>Kontrakte testen</h2>
+          {variant && (
+            <button className="ghost" onClick={() => setOv({ key: item.key, qty: {} })}>
+              Zurücksetzen
+            </button>
+          )}
+        </div>
+        <p className="hint">
+          Nur temporär für diese Ansicht – ändert weder die Übersicht noch gespeicherte Stacks. 0 Kontrakte = Algo aus dem Stack nehmen.
+        </p>
+        <div className="sim-row">
+          {item.legs.map((l) => {
+            const m = library.meta[l.strategyId]
+            const q = qtyOv[l.strategyId] ?? l.qty
+            return (
+              <div key={l.strategyId} className={'field leg-field' + (q !== l.qty ? ' changed' : '')}>
+                <span>
+                  {m?.name ?? l.strategyId} · {m?.instrument} (Original {l.qty})
+                </span>
+                <span className="stepper">
+                  <button className="ghost" onClick={() => setQty(l.strategyId, Math.max(0, q - 1))}>
+                    −
+                  </button>
+                  <input type="number" min={0} value={q} onChange={(e) => setQty(l.strategyId, Math.max(0, Number(e.target.value) || 0))} />
+                  <button className="ghost" onClick={() => setQty(l.strategyId, q + 1)}>
+                    +
+                  </button>
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        {variant && (
+          <div className="table-wrap">
+            <table className="grid compact">
+              <thead>
+                <tr>
+                  <th className="left"></th>
+                  <th className="left">Kontrakte</th>
+                  <th>Ø Freischaltungen</th>
+                  <th>Alle … Tage</th>
+                  <th>Kosten / Freischaltung</th>
+                  <th>Bestehensquote</th>
+                  <th>Gewinn (Median)</th>
+                  <th>Max DD (Median)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: 'Original', it: item, r: baseMc },
+                  { label: 'Angepasst', it: variant, r: mc },
+                ].map(({ label, it, r }) => (
+                  <tr key={label}>
+                    <td className="left name">{label}</td>
+                    <td className="left muted">{it.legs.map(shortLegLabel).join(' + ')}</td>
+                    <td className="key">{n1(r.unlocks.mean)}</td>
+                    <td>{dpu(r.daysPerUnlock)}</td>
+                    <td>{r.costPerUnlock === null ? '–' : usd(r.costPerUnlock)}</td>
+                    <td>{r.evalPassRate === null ? '–' : pct(r.evalPassRate)}</td>
+                    <td>{usd(r.netProfit.p50)}</td>
+                    <td>{usd(r.maxDrawdown.p50)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
         <h2>
-          Ergebnis pro {yearLabel} · {item.name}
+          Ergebnis pro {yearLabel} · {active.name}
         </h2>
         <div className="kpis">
           <div className="kpi highlight">
@@ -113,9 +193,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
             <small>Ø {n1(mc.bought.mean)} Accounts gekauft</small>
           </div>
           <div className="kpi">
-            <span>Dauer bis 1. Freischaltung</span>
-            <b>{mc.firstUnlockDays ? d0(mc.firstUnlockDays.p50) : '–'}</b>
-            <small>{mc.firstUnlockDays ? `Median · 80 % zwischen ${range(mc.firstUnlockDays.p10, mc.firstUnlockDays.p90, d0)}` : 'keine Freischaltung'}</small>
+            <span>Alle … Tage eine Freischaltung</span>
+            <b>{dpu(mc.daysPerUnlock)}</b>
+            <small>
+              {mc.cycleDays
+                ? `je Zyklus: Median ${d0(mc.cycleDays.p50)} · 80 % zwischen ${range(mc.cycleDays.p10, mc.cycleDays.p90, d0)}`
+                : 'keine Freischaltung'}
+            </small>
           </div>
           <div className="kpi">
             <span>Bestehensquote</span>
@@ -155,13 +239,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
             </ResponsiveContainer>
           </div>
           <div>
-            <h3>Kalendertage bis zur 1. Freischaltung</h3>
+            <h3>Kalendertage pro Freischaltung (je Zyklus)</h3>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={firstHist} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <BarChart data={cycleHist} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--grid)" vertical={false} />
                 <XAxis dataKey="label" stroke="var(--muted)" fontSize={11} interval="preserveStartEnd" />
                 <YAxis tickFormatter={(v) => pct(Number(v))} stroke="var(--muted)" fontSize={12} width={48} />
-                <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => (l === 'keine' ? 'keine Freischaltung' : `${l} Tage`)} formatter={(v) => [pct(Number(v)), 'Anteil']} cursor={{ fill: 'var(--grid)' }} />
+                <Tooltip contentStyle={tooltipStyle} labelFormatter={(l) => `${l} Tage`} formatter={(v) => [pct(Number(v)), 'Anteil']} cursor={{ fill: 'var(--grid)' }} />
                 <Bar isAnimationActive={false} dataKey="share" fill="var(--pos)" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -182,7 +266,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                 <th>P10 – P90</th>
                 <th>Mind. 1</th>
                 <th>Kosten / Freischaltung</th>
-                <th>Median bis 1.</th>
+                <th>Alle … Tage</th>
                 <th>Bestehensquote</th>
                 <th>Gewinn (Median)</th>
                 <th>Max DD (Median)</th>
@@ -197,7 +281,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                   <td>{range(r.unlocks.p10, r.unlocks.p90, n1)}</td>
                   <td>{pct(r.pAnyUnlock)}</td>
                   <td>{r.costPerUnlock === null ? '–' : usd(r.costPerUnlock)}</td>
-                  <td>{r.firstUnlockDays ? d0(r.firstUnlockDays.p50) : '–'}</td>
+                  <td>{dpu(r.daysPerUnlock)}</td>
                   <td>{r.evalPassRate === null ? '–' : pct(r.evalPassRate)}</td>
                   <td>{usd(r.netProfit.p50)}</td>
                   <td>{usd(r.maxDrawdown.p50)}</td>

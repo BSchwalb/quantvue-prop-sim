@@ -1,5 +1,5 @@
 import type { DaySteps } from './equity'
-import { simulateCampaign, summarize, type AccountRules } from './prop'
+import { daysBetween, simulateCampaign, summarize, type AccountRules } from './prop'
 
 /** Deterministischer Zufallsgenerator (mulberry32) – gleicher Seed = gleiche Ziehungen */
 export function makeRng(seed: number): () => number {
@@ -70,6 +70,10 @@ export interface McPathResult {
   lostFunded: number
   /** Kalendertage bis zur ersten Freischaltung, null = keine im Durchlauf */
   firstUnlockDays: number | null
+  /** Dauer jedes abgeschlossenen Zyklus (Start bzw. letzte Freischaltung → nächste Freischaltung) in Kalendertagen */
+  cycleDays: number[]
+  /** Kalendertage des Durchlaufs */
+  calendarDays: number
   netProfit: number
   maxDrawdown: number
 }
@@ -94,6 +98,12 @@ export interface McResult {
   /** Gesamtkosten / Gesamtfreischaltungen über alle Durchläufe */
   costPerUnlock: number | null
   firstUnlockDays: Dist | null
+  /** Ø Kalendertage pro Freischaltung = Gesamttage / Gesamtfreischaltungen (inkl. unfertiger Zyklen am Ende) */
+  daysPerUnlock: number | null
+  /** Verteilung der abgeschlossenen Zyklen */
+  cycleDays: Dist | null
+  /** Häufigkeit der Zyklusdauer in 15-Tage-Schritten */
+  cycleHistogram: { from: number; share: number }[]
   evalPassRate: number | null
   fundedSuccessRate: number | null
   /** Häufigkeit: Anzahl Freischaltungen → Anteil Durchläufe */
@@ -145,6 +155,8 @@ export function runMonteCarlo(byDay: Map<string, DaySteps>, pool: string[], path
       lostEval: sum.lostEval,
       lostFunded: sum.lostFunded,
       firstUnlockDays: sum.cycles[0]?.days ?? null,
+      cycleDays: sum.cycles.map((c, k) => (k === 0 ? c.days : daysBetween(sum.cycles[k - 1].unlockDay, c.unlockDay))),
+      calendarDays: daysBetween(dates[0], dates[dates.length - 1]) + 1,
       netProfit: bal,
       maxDrawdown: maxDD,
     })
@@ -162,8 +174,17 @@ export function runMonteCarlo(byDay: Map<string, DaySteps>, pool: string[], path
     share: results.filter((r) => r.unlocks === u).length / Math.max(results.length, 1),
   }))
 
+  const cyc = results.flatMap((r) => r.cycleDays)
+  const totDays = results.reduce((a, r) => a + r.calendarDays, 0)
+  const BIN = 15
+  const cycleHistogram = Array.from({ length: cyc.length ? Math.floor(Math.max(...cyc) / BIN) + 1 : 0 }, (_, i) => ({ from: i * BIN, share: 0 }))
+  for (const c of cyc) cycleHistogram[Math.floor(c / BIN)].share += 1 / cyc.length
+
   return {
     paths: results,
+    daysPerUnlock: totU ? totDays / totU : null,
+    cycleDays: cyc.length ? dist(cyc) : null,
+    cycleHistogram,
     months: (len / YEAR_BUSINESS_DAYS) * 12,
     unlocks: dist(results.map((r) => r.unlocks)),
     bought: dist(results.map((r) => r.bought)),

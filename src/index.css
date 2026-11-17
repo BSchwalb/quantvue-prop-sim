@@ -367,3 +367,25 @@ table.grid {
     grid-template-columns: 1fr;
   }
 }
+
+.row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.stepper {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.stepper button {
+  padding: 4px 10px;
+}
+.stepper input[type='number'] {
+  width: 64px;
+}
+.leg-field.changed span:first-child {
+  color: var(--accent);
+  font-weight: 600;
+}
