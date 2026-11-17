@@ -35,6 +35,8 @@ const d0 = (n: number) => `${Math.round(n)} T`
 /** Tage pro Freischaltung – sehr seltene Freischaltungen nicht als absurde Zahl anzeigen */
 const dpu = (n: number | null) => (n === null ? '–' : n > 730 ? '> 2 Jahre' : d0(n))
 const n1 = (n: number) => num2(n).replace(/,00$/, '')
+const rates = (r: McResult) =>
+  `${r.evalPassRate === null ? '–' : pct(r.evalPassRate)} → ${r.fundedSuccessRate === null ? '–' : pct(r.fundedSuccessRate)}`
 
 export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   const [cfg, setCfg] = usePersistent<McSettings>('qps.mc', { n: 500, mode: 'bootstrap', seed: 1 })
@@ -63,6 +65,15 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   }, [items, pool, paths, rules, variant, mc])
 
   const perMonthToDD = useMemo(() => dist(mc.paths.map((p) => (p.maxDrawdown > 0 ? p.netProfit / mc.months / p.maxDrawdown : 0))), [mc])
+  const funnel = useMemo(() => {
+    const n = Math.max(mc.paths.length, 1)
+    const avg = (f: (p: McResult['paths'][number]) => number) => mc.paths.reduce((a, p) => a + f(p), 0) / n
+    const bought = avg((p) => p.bought)
+    const passed = avg((p) => p.evalPassed)
+    const unlocked = avg((p) => p.unlocks)
+    const open = bought - avg((p) => p.lostEval) - avg((p) => p.lostFunded) - unlocked
+    return { bought, passed, unlocked, open }
+  }, [mc])
   const cycleHist = mc.cycleHistogram.map((h) => ({ label: `${h.from}–${h.from + 14}`, share: h.share }))
 
   const yearLabel = cfg.mode === 'bootstrap' ? 'Jahr' : `Durchlauf (${num2(mc.months)} Mon.)`
@@ -145,7 +156,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                   <th>Ø Freischaltungen</th>
                   <th>Alle … Tage</th>
                   <th>Kosten / Freischaltung</th>
-                  <th>Bestehensquote</th>
+                  <th>Eval → Freigeschaltet</th>
                   <th>Gewinn (Median)</th>
                   <th>Max DD (Median)</th>
                 </tr>
@@ -161,7 +172,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                     <td className="key">{n1(r.unlocks.mean)}</td>
                     <td>{dpu(r.daysPerUnlock)}</td>
                     <td>{r.costPerUnlock === null ? '–' : usd(r.costPerUnlock)}</td>
-                    <td>{r.evalPassRate === null ? '–' : pct(r.evalPassRate)}</td>
+                    <td>{rates(r)}</td>
                     <td>{usd(r.netProfit.p50)}</td>
                     <td>{usd(r.maxDrawdown.p50)}</td>
                   </tr>
@@ -202,9 +213,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
             </small>
           </div>
           <div className="kpi">
-            <span>Bestehensquote</span>
-            <b>{mc.evalPassRate === null ? '–' : pct(mc.evalPassRate)}</b>
-            <small>Freischaufeln danach {mc.fundedSuccessRate === null ? '–' : pct(mc.fundedSuccessRate)}</small>
+            <span>Erfolg pro gekauftem Account</span>
+            <b>{funnel.bought ? pct(funnel.unlocked / funnel.bought) : '–'}</b>
+            <small>
+              Ø {n1(funnel.bought)} gekauft → {n1(funnel.passed)} Eval bestanden ({mc.evalPassRate === null ? '–' : pct(mc.evalPassRate)}) →{' '}
+              {n1(funnel.unlocked)} freigeschaltet ({mc.fundedSuccessRate === null ? '–' : pct(mc.fundedSuccessRate)} davon)
+              {funnel.open >= 0.05 ? ` · ${n1(funnel.open)} laufen am Ende noch` : ''}
+            </small>
           </div>
         </div>
         <div className="kpis">
@@ -267,7 +282,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                 <th>Mind. 1</th>
                 <th>Kosten / Freischaltung</th>
                 <th>Alle … Tage</th>
-                <th>Bestehensquote</th>
+                <th>Eval → Freigeschaltet</th>
                 <th>Gewinn (Median)</th>
                 <th>Max DD (Median)</th>
               </tr>
@@ -282,7 +297,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                   <td>{pct(r.pAnyUnlock)}</td>
                   <td>{r.costPerUnlock === null ? '–' : usd(r.costPerUnlock)}</td>
                   <td>{dpu(r.daysPerUnlock)}</td>
-                  <td>{r.evalPassRate === null ? '–' : pct(r.evalPassRate)}</td>
+                  <td>{rates(r)}</td>
                   <td>{usd(r.netProfit.p50)}</td>
                   <td>{usd(r.maxDrawdown.p50)}</td>
                 </tr>

@@ -78,9 +78,12 @@ export function AccountSim({ items, period, item, setItemKey, acc }: Props) {
             <small>inkl. Fehlversuche · erfolgreicher Account allein {days(sum.avgDaysAccount)}</small>
           </div>
           <div className="kpi">
-            <span>Bestehensquote</span>
-            <b>{sum.evalPassRate === null ? '–' : pct(sum.evalPassRate)}</b>
-            <small>Freischaufeln danach {sum.fundedSuccessRate === null ? '–' : pct(sum.fundedSuccessRate)}</small>
+            <span>Erfolg pro gekauftem Account</span>
+            <b>{sum.bought ? pct(sum.unlocked / sum.bought) : '–'}</b>
+            <small>
+              {sum.bought} gekauft → {sum.evalPassed} Eval bestanden ({sum.evalPassRate === null ? '–' : pct(sum.evalPassRate)}) → {sum.unlocked} freigeschaltet (
+              {sum.fundedSuccessRate === null ? '–' : pct(sum.fundedSuccessRate)} davon){sum.open ? ' · 1 läuft noch' : ''}
+            </small>
           </div>
         </div>
 
