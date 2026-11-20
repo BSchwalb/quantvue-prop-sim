@@ -44,5 +44,19 @@
         "qty": 10
       }
     ]
+  },
+  {
+    "id": "rhino_qorb_mes_3k",
+    "name": "Rhino QOrb/MES 3k Stack",
+    "legs": [
+      {
+        "strategyId": "qorb_rhino",
+        "qty": 2
+      },
+      {
+        "strategyId": "omega_es",
+        "qty": 3
+      }
+    ]
   }
 ]

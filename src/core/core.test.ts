@@ -78,7 +78,7 @@ describe('Trades über Nacht', () => {
 
 describe('echte Backtests', () => {
   it('sind geladen', () => {
-    expect(Object.keys(library.meta).sort()).toEqual(['bubbagump_3', 'omega_es', 'omega_rty', 'profandy_optimus_zeus_prime', 'profandy_qorb_deadeye', 'qorb_jn'])
+    expect(Object.keys(library.meta).sort()).toEqual(['bubbagump_3', 'omega_es', 'omega_rty', 'profandy_optimus_zeus_prime', 'profandy_qorb_deadeye', 'qorb_jn', 'qorb_rhino'])
     expect(library.trades.qorb_jn.length).toBe(326)
   })
 })
