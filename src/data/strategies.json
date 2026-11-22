@@ -11,13 +11,13 @@
   },
   {
     "id": "omega_es",
-    "name": "Omega ES (DC on, medium-low)",
+    "name": "Rhino OmegaES",
     "instrument": "MES",
     "pointValue": 5,
-    "defaultQty": 1,
+    "defaultQty": 10,
     "costPerContract": 2,
     "file": "omega_es.csv",
-    "notes": "Export omega_es_default_dc_on_medum_low-backtest-trades-2026-10-21T02-25-35-929Z-rebuilt.csv"
+    "notes": "Export e00b3725-omega_es-backtest-trades-2026-11-22T10-05-02-608Z.csv"
   },
   {
     "id": "omega_rty",
