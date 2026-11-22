@@ -15,7 +15,7 @@ Sprache der App und der Kommunikation: Deutsch.
    ```bash
    node scripts/import-backtest.mjs --file <upload.csv> --id <id> --name "<Name>" --instrument MNQ --qty 3
    ```
-3. Optional neue Stacks in `src/data/stacks.json` ergänzen, wenn der User einen Stack nennt.
+3. Stacks verwaltet der User selbst in der App (Stack-Builder, im Browser gespeichert). `src/data/stacks.json` bleibt leer – keine fest hinterlegten Stacks anlegen, außer der User verlangt es ausdrücklich. Wenn der User einen Stack nennt: Zahlen liefern und ggf. eine Import-JSON bereitstellen.
 4. `npm test && npm run build`, dann committen und pushen.
 
 ## Konventionen
