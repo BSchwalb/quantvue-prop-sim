@@ -54,10 +54,10 @@
     "name": "ProfAndy_Optimus_Zeus_Prime",
     "instrument": "M2K",
     "pointValue": 5,
-    "defaultQty": 10,
+    "defaultQty": 5,
     "costPerContract": 2,
     "file": "profandy_optimus_zeus_prime.csv",
-    "notes": "Export 284ea1a8-RTY_Optimus_Zeus_V2qzeus-backtest-trades-2026-11-14T05-08-37-008Z.csv"
+    "notes": "Export ede9ae2f-qzeus-backtest-trades-2026-11-22T10-08-12-568Z.csv"
   },
   {
     "id": "qorb_rhino",

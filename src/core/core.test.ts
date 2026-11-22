@@ -84,17 +84,28 @@ describe('echte Backtests', () => {
 })
 
 describe('Datenbereich', () => {
+  const t = (id: string, day: string): RawTrade => ({
+    strategyId: id, index: 1, direction: 'long', entryT: 0, exitT: 1, day, exitDay: day,
+    pnlPoints: 1, maePoints: 0, mfePoints: 1, exitReason: 'tp',
+  })
+  const meta = (id: string) => ({ id, name: id, instrument: 'MNQ', pointValue: 2, defaultQty: 1, costPerContract: 2, file: '' })
+  const lib: Library = {
+    meta: { a: meta('a'), b: meta('b'), c: meta('c') },
+    trades: {
+      a: [t('a', '2024-01-02'), t('a', '2026-11-17')], // lange Historie
+      b: [t('b', '2026-01-06'), t('b', '2026-11-04')], // erst ab 2026, letzter Trade knapp vor Datenende
+      c: [t('c', '2024-01-03'), t('c', '2025-06-30')], // endet deutlich früher
+    },
+  }
   it('Stack wird auf die Schnittmenge der Algos beschränkt', () => {
-    const zeus = legsRange([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }])!
-    const stack = legsRange([
-      { strategyId: 'profandy_qorb_deadeye', qty: 1 },
-      { strategyId: 'profandy_optimus_zeus_prime', qty: 1 },
-    ])!
-    expect(stack.from).toBe(zeus.from) // Zeus beginnt später als Deadeye
-    expect(clampPeriod([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }], { from: '2025-01-01', to: '2025-12-31' })).toBeNull()
-    expect(clampPeriod([{ strategyId: 'profandy_qorb_deadeye', qty: 1 }], { from: '2000-01-01', to: '2099-12-31' })!.from).toBe('2024-01-01')
-    // Zeus: letzter Trade 04.11., aber nahe am Datenende -> gilt bis zum Datenende
-    expect(legsRange([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }])!.to).toBe(stack.to)
-    expect(stack.to >= '2026-11-13').toBe(true)
+    expect(legsRange([{ strategyId: 'a', qty: 1 }], lib)).toEqual({ from: '2024-01-01', to: '2026-11-17' })
+    // b: Beginn = Monatserster, Ende = Datenende (letzter Trade < 45 Tage davor)
+    expect(legsRange([{ strategyId: 'b', qty: 1 }], lib)).toEqual({ from: '2026-01-01', to: '2026-11-17' })
+    // c endet > 45 Tage vor Datenende -> letzter Trade
+    expect(legsRange([{ strategyId: 'c', qty: 1 }], lib)!.to).toBe('2025-06-30')
+    expect(legsRange([{ strategyId: 'a', qty: 1 }, { strategyId: 'b', qty: 1 }], lib)).toEqual({ from: '2026-01-01', to: '2026-11-17' })
+    expect(legsRange([{ strategyId: 'b', qty: 1 }, { strategyId: 'c', qty: 1 }], lib)).toBeNull()
+    expect(clampPeriod([{ strategyId: 'b', qty: 1 }], { from: '2025-01-01', to: '2025-12-31' }, lib)).toBeNull()
+    expect(clampPeriod([{ strategyId: 'a', qty: 1 }], { from: '2025-01-01', to: '2025-12-31' }, lib)).toEqual({ from: '2025-01-01', to: '2025-12-31' })
   })
 })
