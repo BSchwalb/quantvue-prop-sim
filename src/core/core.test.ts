@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildSteps, groupByDay, scaleLegs, type Library } from './equity'
 import { computeMetrics } from './metrics'
-import { library } from './registry'
+import { clampPeriod, legsRange, library } from './registry'
 import type { RawTrade, ScaledTrade } from './types'
 
 const tr = (day: string, entryMin: number, exitMin: number, pnl: number, mae: number, mfe = 0): ScaledTrade => {
@@ -80,5 +80,21 @@ describe('echte Backtests', () => {
   it('sind geladen', () => {
     expect(Object.keys(library.meta).sort()).toEqual(['bubbagump_3', 'omega_es', 'omega_rty', 'profandy_optimus_zeus_prime', 'profandy_qorb_deadeye', 'qorb_jn', 'qorb_rhino'])
     expect(library.trades.qorb_jn.length).toBe(326)
+  })
+})
+
+describe('Datenbereich', () => {
+  it('Stack wird auf die Schnittmenge der Algos beschränkt', () => {
+    const zeus = legsRange([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }])!
+    const stack = legsRange([
+      { strategyId: 'profandy_qorb_deadeye', qty: 1 },
+      { strategyId: 'profandy_optimus_zeus_prime', qty: 1 },
+    ])!
+    expect(stack.from).toBe(zeus.from) // Zeus beginnt später als Deadeye
+    expect(clampPeriod([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }], { from: '2025-01-01', to: '2025-12-31' })).toBeNull()
+    expect(clampPeriod([{ strategyId: 'profandy_qorb_deadeye', qty: 1 }], { from: '2000-01-01', to: '2099-12-31' })!.from).toBe('2024-01-01')
+    // Zeus: letzter Trade 04.11., aber nahe am Datenende -> gilt bis zum Datenende
+    expect(legsRange([{ strategyId: 'profandy_optimus_zeus_prime', qty: 1 }])!.to).toBe(stack.to)
+    expect(stack.to >= '2026-11-13').toBe(true)
   })
 })

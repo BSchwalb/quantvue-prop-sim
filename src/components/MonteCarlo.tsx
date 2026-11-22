@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { AccountRulesState } from '../accounts'
 import { businessDays, dist, drawPaths, runMonteCarlo, type McMode, type McResult } from '../core/montecarlo'
+import { clampPeriod } from '../core/registry'
 import type { AccountRules } from '../core/prop'
 import type { Period } from '../core/types'
 import { fmtDate, num2, pct, ratio, usd } from '../format'
@@ -24,9 +25,28 @@ interface McSettings {
   seed: number
 }
 
-function mcFor(item: Item, pool: string[], paths: number[][], rules: AccountRules): McResult {
+const pathCache = new Map<string, number[][]>()
+/** Ziehungen gecacht nach Pool-Länge/Einstellungen: gleiche Datenbasis = identische synthetische Jahre */
+function pathsFor(poolLen: number, cfg: McSettings): number[][] {
+  const key = `${poolLen}|${cfg.n}|${cfg.mode}|${cfg.seed}`
+  let p = pathCache.get(key)
+  if (!p) {
+    p = drawPaths(poolLen, cfg.n, cfg.mode, cfg.seed)
+    pathCache.set(key, p)
+  }
+  return p
+}
+
+/** Pool = Werktage im gewählten Zeitraum, beschränkt auf den Datenbereich des Algos/Stacks */
+function poolFor(item: Item, period: Period): string[] {
+  const p = clampPeriod(item.legs, period)
+  return p ? businessDays(p.from, p.to) : []
+}
+
+function mcFor(item: Item, period: Period, cfg: McSettings, rules: AccountRules): McResult {
+  const pool = poolFor(item, period)
   const byDay = new Map(daysFor(item.legs).map((d) => [d.day, d]))
-  return runMonteCarlo(byDay, pool, paths, rules)
+  return runMonteCarlo(byDay, pool, pool.length ? pathsFor(pool.length, cfg) : [], rules)
 }
 
 const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }
@@ -42,8 +62,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   const [cfg, setCfg] = usePersistent<McSettings>('qps.mc', { n: 500, mode: 'bootstrap', seed: 1 })
   const { rules } = acc
 
-  const pool = useMemo(() => businessDays(period.from, period.to), [period])
-  const paths = useMemo(() => drawPaths(pool.length, cfg.n, cfg.mode, cfg.seed), [pool, cfg])
+  const pool = useMemo(() => poolFor(item, period), [item, period])
 
   // Temporäre Kontraktzahlen für den gewählten Algo/Stack (werden nicht gespeichert)
   const [ov, setOv] = useState<{ key: string; qty: Record<string, number> }>({ key: item.key, qty: {} })
@@ -56,13 +75,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   }, [item, qtyOv])
   const active = variant ?? item
 
-  const baseMc = useMemo(() => mcFor(item, pool, paths, rules), [item, pool, paths, rules])
-  const mc = useMemo(() => (variant ? mcFor(variant, pool, paths, rules) : baseMc), [variant, baseMc, pool, paths, rules])
+  const baseMc = useMemo(() => mcFor(item, period, cfg, rules), [item, period, cfg, rules])
+  const mc = useMemo(() => (variant ? mcFor(variant, period, cfg, rules) : baseMc), [variant, baseMc, period, cfg, rules])
   const compare = useMemo(() => {
-    const rows = items.map((it) => ({ it, r: mcFor(it, pool, paths, rules) }))
+    const rows = items.map((it) => ({ it, r: mcFor(it, period, cfg, rules) }))
     if (variant) rows.push({ it: variant, r: mc })
-    return rows.sort((a, b) => b.r.unlocks.mean - a.r.unlocks.mean)
-  }, [items, pool, paths, rules, variant, mc])
+    return rows.filter((x) => x.r.paths.length).sort((a, b) => b.r.unlocks.mean - a.r.unlocks.mean)
+  }, [items, period, cfg, rules, variant, mc])
 
   const perMonthToDD = useMemo(() => dist(mc.paths.map((p) => (p.maxDrawdown > 0 ? p.netProfit / mc.months / p.maxDrawdown : 0))), [mc])
   const funnel = useMemo(() => {
@@ -105,8 +124,8 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
           </label>
         </div>
         <p className="hint">
-          Datenbasis: {pool.length} Werktage im Zeitraum {fmtDate(period.from)} – {fmtDate(period.to)} (oben rechts änderbar), inkl. Tage ohne Trades. Es
-          werden ganze Handelstage gezogen, damit Trades mehrerer Algos am selben Tag zusammenbleiben. Alle Strategien und Stacks laufen auf denselben
+          Datenbasis für {item.name}: {pool.length} Werktage {pool.length ? `(${fmtDate(pool[0])} – ${fmtDate(pool[pool.length - 1])})` : ''} – gewählter Zeitraum (oben rechts), beschränkt auf den Bereich, in dem alle Algos Daten haben; inkl. Tage ohne Trades. Es
+          werden ganze Handelstage gezogen, damit Trades mehrerer Algos am selben Tag zusammenbleiben. Strategien und Stacks mit gleicher Datenbasis laufen auf denselben
           {` ${cfg.n}`} synthetischen {cfg.mode === 'bootstrap' ? 'Jahren' : 'Durchläufen'} (gleicher Seed = gleiche Ergebnisse).{' '}
           {cfg.mode === 'shuffle' && 'Beim Mischen bleibt der Gesamtgewinn gleich, nur die Reihenfolge ändert sich.'}
         </p>
@@ -183,6 +202,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
         )}
       </div>
 
+      {!mc.paths.length && (
+        <div className="card">
+          <p className="muted">Für {item.name} gibt es im gewählten Zeitraum keine Daten. Bitte oben einen anderen Zeitraum wählen.</p>
+        </div>
+      )}
+
+      {mc.paths.length > 0 && (
       <div className="card">
         <h2>
           Ergebnis pro {yearLabel} · {active.name}
@@ -272,6 +298,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
           </div>
         </div>
       </div>
+      )}
 
       <div className="card">
         <h2>Vergleich aller Strategien und Stacks</h2>

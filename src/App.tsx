@@ -12,23 +12,20 @@ import { usePersistent, useUserStacks } from './store'
 import { fmtDate } from './format'
 
 type Tab = 'overview' | 'builder' | 'sim' | 'mc'
-type Preset = 'ytd' | 'prev' | 'all' | 'custom'
+/** 'ytd' | 'all' | 'custom' | 'y2025' (einzelnes Jahr) */
+type Preset = string
 
 const RANGE = dataRange()
 const CUR_YEAR = RANGE.to.slice(0, 4)
-const PREV_YEAR = String(Number(CUR_YEAR) - 1)
+/** abgeschlossene Jahre mit Daten, neueste zuerst */
+const PAST_YEARS = Array.from({ length: Number(CUR_YEAR) - Number(RANGE.from.slice(0, 4)) }, (_, i) => String(Number(CUR_YEAR) - 1 - i))
 
 function presetPeriod(p: Preset, custom: Period): Period {
-  switch (p) {
-    case 'ytd':
-      return { from: `${CUR_YEAR}-01-01`, to: RANGE.to }
-    case 'prev':
-      return { from: `${PREV_YEAR}-01-01`, to: `${PREV_YEAR}-12-31` }
-    case 'all':
-      return RANGE
-    case 'custom':
-      return custom
-  }
+  if (p === 'all') return RANGE
+  if (p === 'custom') return custom
+  if (p === 'prev') p = `y${Number(CUR_YEAR) - 1}` // alter gespeicherter Wert
+  if (/^y\d{4}$/.test(p)) return { from: `${p.slice(1)}-01-01`, to: `${p.slice(1)}-12-31` }
+  return { from: `${CUR_YEAR}-01-01`, to: RANGE.to }
 }
 
 export default function App() {
@@ -73,12 +70,22 @@ export default function App() {
           </button>
         </nav>
         <div className="period">
-          <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)}>
-            <option value="ytd">{CUR_YEAR} (bis {fmtDate(RANGE.to)})</option>
-            <option value="prev">{PREV_YEAR}</option>
-            <option value="all">Gesamter Backtest</option>
-            <option value="custom">Eigener Zeitraum</option>
-          </select>
+          <div className="segmented" role="group" aria-label="Zeitraum">
+            <button className={preset === 'ytd' ? 'active' : ''} onClick={() => setPreset('ytd')} title={`01.01.${CUR_YEAR} – ${fmtDate(RANGE.to)}`}>
+              {CUR_YEAR} YTD
+            </button>
+            <button className={preset === 'all' ? 'active' : ''} onClick={() => setPreset('all')} title={`${fmtDate(RANGE.from)} – ${fmtDate(RANGE.to)}`}>
+              Gesamt
+            </button>
+            {PAST_YEARS.map((y) => (
+              <button key={y} className={preset === `y${y}` || (preset === 'prev' && y === PAST_YEARS[0]) ? 'active' : ''} onClick={() => setPreset(`y${y}`)}>
+                {y}
+              </button>
+            ))}
+            <button className={preset === 'custom' ? 'active' : ''} onClick={() => setPreset('custom')}>
+              Eigener
+            </button>
+          </div>
           {preset === 'custom' && (
             <>
               <input type="date" value={custom.from} onChange={(e) => setCustom({ ...custom, from: e.target.value })} />

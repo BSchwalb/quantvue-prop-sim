@@ -8,6 +8,8 @@ export interface MonthRow {
 }
 
 export interface Metrics {
+  /** tatsächlich ausgewerteter Zeitraum (ggf. auf den Datenbereich beschränkt) */
+  period: Period
   trades: number
   winRate: number
   profitFactor: number
@@ -99,6 +101,7 @@ export function computeMetrics(trades: ScaledTrade[], period: Period): Metrics {
   const months = periodMonths(period)
   const avgMonthly = netProfit / months
   return {
+    period,
     trades: trades.length,
     winRate: trades.length ? wins / trades.length : 0,
     profitFactor: grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0,

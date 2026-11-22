@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
 import { rollingStarts, simulateCampaign, summarize, type AccountRules, type AccountRun, type CampaignSummary, type RollingSummary, type TraceRow } from '../core/prop'
-import { dataRange } from '../core/registry'
+import { clampPeriod, dataRange } from '../core/registry'
 import type { Leg, Period } from '../core/types'
 import type { AccountRulesState } from '../accounts'
 import { SimSetup } from './SimSetup'
@@ -9,7 +9,9 @@ import { AccountEquity } from './AccountEquity'
 import { fmtDate, num2, pct, usd } from '../format'
 import { daysFor, shortLegLabel, type Item } from '../model'
 
-function runFor(legs: Leg[], rules: AccountRules, period: Period, withTrace = false): { sum: CampaignSummary; roll: RollingSummary; trace: TraceRow[] } {
+function runFor(legs: Leg[], rules: AccountRules, selected: Period, withTrace = false): { sum: CampaignSummary; roll: RollingSummary; trace: TraceRow[] } {
+  // nur den Bereich simulieren, in dem alle Algos Daten haben
+  const period = clampPeriod(legs, selected) ?? selected
   const all = daysFor(legs)
   const inPeriod = all.filter((d) => d.day >= period.from && d.day <= period.to)
   const trace: TraceRow[] = []
@@ -34,12 +36,13 @@ interface Props {
   acc: AccountRulesState
 }
 
-export function AccountSim({ items, period, item, setItemKey, acc }: Props) {
+export function AccountSim({ items, period: selected, item, setItemKey, acc }: Props) {
+  const period = clampPeriod(item.legs, selected) ?? selected
   const { rules } = acc
-  const { sum, roll, trace } = useMemo(() => runFor(item.legs, rules, period, true), [item, rules, period])
+  const { sum, roll, trace } = useMemo(() => runFor(item.legs, rules, selected, true), [item, rules, selected])
   const compare = useMemo(
-    () => items.map((it) => ({ it, ...runFor(it.legs, rules, period) })).sort((a, b) => b.sum.unlocksPerMonth - a.sum.unlocksPerMonth),
-    [items, rules, period],
+    () => items.map((it) => ({ it, ...runFor(it.legs, rules, selected) })).sort((a, b) => b.sum.unlocksPerMonth - a.sum.unlocksPerMonth),
+    [items, rules, selected],
   )
 
   const rollChart = roll.points.map((p) => ({ day: p.startDay, days: p.days, fail: p.days === null ? 0 : null }))

@@ -23,5 +23,7 @@ Sprache der App und der Kommunikation: Deutsch.
 - CSV-Werte (`pnl_points`, `mae`, `mfe`) sind Punkte pro 1 Kontrakt; Skalierung erfolgt über `Leg.qty × pointValue`.
 - Max Drawdown = Höchststand (realisiert) bis Tiefpunkt inkl. offener Buchverluste (MAE). Überlappende Trades: MAEs werden als gleichzeitig angenommen (Worst Case).
 - Kernkennzahl: Ø Monatsgewinn / Max DD.
+- Zeiträume werden pro Algo/Stack auf den Datenbereich beschränkt (`clampPeriod`): Stack = Schnittmenge der Algos; Beginn = Monatserster des ersten Trades, Ende = Datenende, wenn der letzte Trade < 45 Tage davor liegt.
+- Backtest-Updates: neue CSV per Import-Skript mit gleicher `--id` einspielen (überschreibt Datei + Metadaten, Instrument/Qty/Kosten mitgeben).
 - Rechenlogik gehört in `src/core/` (reine Funktionen, mit Tests in `*.test.ts`), UI in `src/components/`.
 - Projektplan: `docs/PLAN.md`.

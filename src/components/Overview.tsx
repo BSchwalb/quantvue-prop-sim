@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { Metrics } from '../core/metrics'
 import { library } from '../core/registry'
 import { fmtDate, num2, pct, ratio, usd } from '../format'
+
+const shortMonth = (d: string) => `${d.slice(5, 7)}/${d.slice(2, 4)}`
 import { shortLegLabel, type Item } from '../model'
 
 type SortKey = 'name' | 'trades' | 'netProfit' | 'maxDrawdown' | 'avgMonthly' | 'monthlyToDD' | 'winRate' | 'profitFactor' | 'worstDay'
@@ -40,6 +42,7 @@ export function Overview({ items, metrics, qtyOverrides, setQty, onOpen }: Props
     <tr>
       <th className="left" onClick={() => setSort({ key: 'name', dir: sort.key === 'name' ? (-sort.dir as 1 | -1) : 1 })}>Name</th>
       <th className="left">Kontrakte</th>
+      <th className="left" title="Ausgewerteter Zeitraum – beschränkt auf den Bereich, in dem alle Algos Daten haben">Daten</th>
       {COLS.map((c) => (
         <th
           key={c.key}
@@ -77,6 +80,7 @@ export function Overview({ items, metrics, qtyOverrides, setQty, onOpen }: Props
             <span className="muted">{it.legs.map(shortLegLabel).join(' + ')}</span>
           )}
         </td>
+        <td className="left muted small">{m.trades ? `${shortMonth(m.period.from)}–${shortMonth(m.period.to)}` : 'keine Daten'}</td>
         <td className={m.netProfit >= 0 ? 'pos' : 'neg'}>{usd(m.netProfit)}</td>
         <td title={`am ${fmtDate(m.maxDrawdownDay)} · nur realisiert: ${usd(m.maxDrawdownClosed)}`}>{usd(m.maxDrawdown)}</td>
         <td>{usd(m.avgMonthly)}</td>
@@ -99,11 +103,11 @@ export function Overview({ items, metrics, qtyOverrides, setQty, onOpen }: Props
           <thead>{head}</thead>
           <tbody>
             <tr className="section">
-              <td colSpan={10}>Strategien ({algos.length})</td>
+              <td colSpan={11}>Strategien ({algos.length})</td>
             </tr>
             {sorted(algos).map(row)}
             <tr className="section">
-              <td colSpan={10}>Stacks ({stacks.length})</td>
+              <td colSpan={11}>Stacks ({stacks.length})</td>
             </tr>
             {sorted(stacks).map(row)}
           </tbody>

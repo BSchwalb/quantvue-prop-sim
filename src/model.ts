@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { buildSteps, groupByDay, scaleLegs, type DaySteps } from './core/equity'
 import { computeMetrics, type Metrics } from './core/metrics'
-import { library } from './core/registry'
+import { clampPeriod, library } from './core/registry'
 import type { Leg, Period, Stack } from './core/types'
 
 export interface Item {
@@ -33,8 +33,22 @@ export function buildItems(qtyOverrides: Record<string, number>, stacks: Stack[]
   return [...algos, ...st]
 }
 
+/**
+ * Kennzahlen im Zeitraum – beschränkt auf den Bereich, in dem alle Algos Daten haben,
+ * damit z. B. Ø/Monat bei „Gesamt“ nicht durch Monate ohne Backtest verwässert wird.
+ */
 export function metricsFor(legs: Leg[], period: Period): Metrics {
-  return computeMetrics(scaleLegs(library, legs, period), period)
+  const p = clampPeriod(legs, period) ?? period
+  return computeMetrics(scaleLegs(library, legs, p), p)
+}
+
+/** Jahre (YYYY), in denen alle Algos der Legs Daten haben */
+export function yearsFor(legs: Leg[]): string[] {
+  const p = clampPeriod(legs, { from: '0000-01-01', to: '9999-12-31' })
+  if (!p) return []
+  const out: string[] = []
+  for (let y = +p.from.slice(0, 4); y <= +p.to.slice(0, 4); y++) out.push(String(y))
+  return out
 }
 
 export function useMetrics(items: Item[], period: Period): Map<string, Metrics> {

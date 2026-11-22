@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Metrics } from '../core/metrics'
 import { fmtDate, fmtMonth, num2, pct, ratio, usd } from '../format'
-import { legLabel, type Item } from '../model'
+import { legLabel, metricsFor, yearsFor, type Item } from '../model'
 
 export function Kpis({ m }: { m: Metrics }) {
   return (
@@ -112,6 +112,61 @@ export function MonthlyChart({ m }: { m: Metrics }) {
   )
 }
 
+/** Performance je Kalenderjahr + Gesamt (unabhängig vom oben gewählten Zeitraum) */
+export function YearTable({ item }: { item: Item }) {
+  const rows = useMemo(() => {
+    const years = yearsFor(item.legs)
+    const list = years.map((y) => ({ label: y, m: metricsFor(item.legs, { from: `${y}-01-01`, to: `${y}-12-31` }) }))
+    if (years.length > 1) list.push({ label: 'Gesamt', m: metricsFor(item.legs, { from: '0000-01-01', to: '9999-12-31' }) })
+    return list
+  }, [item])
+  return (
+    <>
+      <h3>Performance nach Jahr</h3>
+      <div className="table-wrap">
+        <table className="grid compact">
+          <thead>
+            <tr>
+              <th className="left">Jahr</th>
+              <th className="left">Daten</th>
+              <th>Trades</th>
+              <th>Gewinn</th>
+              <th>Max DD</th>
+              <th>Ø / Monat</th>
+              <th>Monat / DD</th>
+              <th>Win %</th>
+              <th>PF</th>
+              <th>Schlechtester Tag</th>
+              <th>Verluste in Folge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ label, m }) => (
+              <tr key={label} className={label === 'Gesamt' ? 'total' : ''}>
+                <td className="left name">{label}</td>
+                <td className="left muted small">
+                  {fmtDate(m.period.from).slice(0, 5)} – {fmtDate(m.period.to)}
+                </td>
+                <td>{m.trades}</td>
+                <td className={m.netProfit >= 0 ? 'pos' : 'neg'}>{usd(m.netProfit)}</td>
+                <td title={`am ${fmtDate(m.maxDrawdownDay)}`}>{usd(m.maxDrawdown)}</td>
+                <td>{usd(m.avgMonthly)}</td>
+                <td className="key">{ratio(m.monthlyToDD)}</td>
+                <td>{pct(m.winRate)}</td>
+                <td>{num2(m.profitFactor)}</td>
+                <td className="neg" title={fmtDate(m.worstDayDate)}>
+                  {usd(m.worstDay)}
+                </td>
+                <td>{m.maxLosingStreak}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 export function Detail({ item, m, onBack }: { item: Item; m: Metrics; onBack: () => void }) {
   return (
     <div className="card">
@@ -122,9 +177,13 @@ export function Detail({ item, m, onBack }: { item: Item; m: Metrics; onBack: ()
         <div>
           <h2>{item.name}</h2>
           <div className="muted">{item.legs.map(legLabel).join('  +  ')}</div>
+          <div className="muted small">
+            Ausgewerteter Zeitraum: {fmtDate(m.period.from)} – {fmtDate(m.period.to)}
+          </div>
         </div>
       </div>
       <Kpis m={m} />
+      <YearTable item={item} />
       <EquityCharts m={m} />
       <MonthlyChart m={m} />
       <div className="table-wrap">
