@@ -68,5 +68,15 @@
     "costPerContract": 2,
     "file": "qorb_rhino.csv",
     "notes": "Export c798e1e3-QORB_Rhino_2026-10-27-rebuilt.csv"
+  },
+  {
+    "id": "jtn4_sharpshooter_qliquidity",
+    "name": "JTN4 SharpShooter Qliquidity",
+    "instrument": "MNQ",
+    "pointValue": 2,
+    "defaultQty": 1,
+    "costPerContract": 2,
+    "file": "jtn4_sharpshooter_qliquidity.csv",
+    "notes": "Export 44951edb-qliquidity-backtest-trades-2026-11-22T09-42-36-430Z.csv"
   }
 ]
