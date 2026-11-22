@@ -21,7 +21,13 @@ interface Props {
   onApply: (qty: number[]) => void
 }
 
-type SortKey = 'profit' | 'unlocks' | 'success' | 'factor'
+type SortKey = 'profit' | 'time' | 'cost'
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'profit', label: 'Gewinn / Monat' },
+  { key: 'time', label: 'Zeit bis Freischaltung' },
+  { key: 'cost', label: 'Kosten pro Freischaltung' },
+]
 
 interface Candidate {
   qty: number[]
@@ -32,7 +38,10 @@ interface Candidate {
   mc: McResult | null
 }
 
-/** wie viele Kandidaten (nach Gewinn/Monat) zusätzlich per Monte Carlo bewertet werden */
+/**
+ * wie viele Kandidaten zusätzlich per Monte Carlo bewertet werden – jeweils die besten nach
+ * Gewinn/Monat und nach Faktor (Monat/DD), damit auch sichere/günstige Varianten dabei sind
+ */
 const MC_CANDIDATES = 25
 const SHOW = 5
 
@@ -88,8 +97,9 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
         if (id !== runId.current) return
       }
     }
-    fit.sort((a, b) => b.perMonth - a.perMonth)
-    const top = fit.slice(0, MC_CANDIDATES)
+    const byProfit = [...fit].sort((a, b) => b.perMonth - a.perMonth).slice(0, MC_CANDIDATES)
+    const byFactor = [...fit].sort((a, b) => b.factor - a.factor).slice(0, MC_CANDIDATES)
+    const top = [...new Set([...byProfit, ...byFactor])]
     for (let i = 0; i < top.length; i++) {
       setStatus(`Monte Carlo für die besten Kandidaten … ${i + 1} / ${top.length}`)
       await tick()
@@ -105,7 +115,7 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
       info:
         `${combos.length.toLocaleString('de-DE')} Kombinationen geprüft (0–${max.join(' / ')} Kontrakte` +
         `${step > 1 ? `, in ${step}er-Schritten` : ''}), ${fit.length.toLocaleString('de-DE')} innerhalb des Budgets, ` +
-        `die ${top.length} mit dem höchsten Gewinn/Monat per Monte Carlo bewertet.`,
+        `davon die ${top.length} besten nach Gewinn/Monat bzw. Faktor per Monte Carlo bewertet.`,
     })
     setStatus('')
     setRunning(false)
@@ -113,15 +123,10 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
 
   const sorted = useMemo(() => {
     if (!shown) return []
+    // höher ist besser (Gewinn) bzw. niedriger ist besser (Zeit, Kosten); ohne Freischaltung ans Ende
     const val = (c: Candidate) =>
-      sort === 'profit'
-        ? c.perMonth
-        : sort === 'factor'
-          ? c.factor
-          : sort === 'unlocks'
-            ? (c.mc?.unlocks.mean ?? 0)
-            : (successRate(c.mc!) ?? 0)
-    return [...shown.list].sort((a, b) => val(b) - val(a) || b.perMonth - a.perMonth).slice(0, SHOW)
+      sort === 'profit' ? -c.perMonth : sort === 'time' ? (c.mc?.daysPerUnlock ?? Infinity) : (c.mc?.costPerUnlock ?? Infinity)
+    return [...shown.list].sort((a, b) => val(a) - val(b) || b.perMonth - a.perMonth).slice(0, SHOW)
   }, [shown, sort])
 
   const qtyLabel = (qty: number[]) =>
@@ -143,13 +148,13 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
     <tr key={label + c.qty.join('-')} className={apply ? '' : 'total'}>
       <td className="left name">{label}</td>
       <td className="left">{qtyLabel(c.qty)}</td>
-      <td>{usd(c.perMonth)}</td>
+      <td className={sort === 'profit' ? 'key' : ''}>{usd(c.perMonth)}</td>
       <td>{usd(c.maxDrawdown)}</td>
-      <td className={sort === 'factor' ? 'key' : ''}>{ratio(c.factor)}</td>
-      <td className={sort === 'unlocks' ? 'key' : ''}>{c.mc ? n1(c.mc.unlocks.mean) : '–'}</td>
-      <td className={sort === 'success' ? 'key' : ''}>{c.mc && successRate(c.mc) !== null ? pct(successRate(c.mc)!) : '–'}</td>
-      <td>{c.mc ? dpu(c.mc.daysPerUnlock) : '–'}</td>
-      <td>{c.mc?.costPerUnlock == null ? '–' : usd(c.mc.costPerUnlock)}</td>
+      <td>{ratio(c.factor)}</td>
+      <td>{c.mc ? n1(c.mc.unlocks.mean) : '–'}</td>
+      <td>{c.mc && successRate(c.mc) !== null ? pct(successRate(c.mc)!) : '–'}</td>
+      <td className={sort === 'time' ? 'key' : ''}>{c.mc ? dpu(c.mc.daysPerUnlock) : '–'}</td>
+      <td className={sort === 'cost' ? 'key' : ''}>{c.mc?.costPerUnlock == null ? '–' : usd(c.mc.costPerUnlock)}</td>
       <td>
         {apply && (
           <button className="ghost" onClick={() => onApply(c.qty)}>
@@ -176,15 +181,6 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
           <span>max. Kontrakte je Algo</span>
           <input type="number" min={1} value={cap} onChange={(e) => setCap(Math.max(1, Number(e.target.value) || 1))} />
         </label>
-        <label className="field">
-          <span>Sortieren nach</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-            <option value="profit">Ø Gewinn / Monat</option>
-            <option value="unlocks">Freischaltungen / Jahr</option>
-            <option value="success">Erfolg pro gekauftem Account</option>
-            <option value="factor">Faktor (Monat / DD)</option>
-          </select>
-        </label>
         <div className="row-actions bottom">
           <button onClick={run} disabled={running || budget <= 0}>
             {running ? 'Läuft …' : 'Testen'}
@@ -196,6 +192,16 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
       {shown && (
         <>
           <p className="hint">{shown.info}</p>
+          <div className="row-head opt-sort">
+            <span className="muted">Top {SHOW} nach</span>
+            <div className="segmented" role="group" aria-label="Top 5 sortieren nach">
+              {SORTS.map((o) => (
+                <button key={o.key} className={sort === o.key ? 'active' : ''} onClick={() => setSort(o.key)}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {sorted.length === 0 ? (
             <p className="muted">Keine Kombination mit Gewinn liegt innerhalb von {usd(budget)} Max DD.</p>
           ) : (
@@ -210,7 +216,7 @@ export function Optimizer({ item, period, cfg, rules, current, currentDD, onAppl
                     <th>Faktor</th>
                     <th>Freischaltungen / Jahr</th>
                     <th>Erfolg / Account</th>
-                    <th>Alle … Tage</th>
+                    <th>Zeit bis Freischaltung</th>
                     <th>Kosten / Freischaltung</th>
                     <th></th>
                   </tr>

@@ -487,3 +487,8 @@ div.small {
   content: ' + ';
   color: var(--muted);
 }
+
+.opt-sort {
+  justify-content: flex-start;
+  margin: 8px 0;
+}
