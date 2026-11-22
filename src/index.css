@@ -474,3 +474,16 @@ table.grid {
 div.small {
   font-size: 12px;
 }
+
+.compact-kpis {
+  margin-top: 4px;
+}
+.kpi small em,
+.opt-leg em {
+  font-style: normal;
+  font-weight: 600;
+}
+.opt-leg + .opt-leg::before {
+  content: ' + ';
+  color: var(--muted);
+}

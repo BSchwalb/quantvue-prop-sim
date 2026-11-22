@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { AccountRulesState } from '../accounts'
-import { businessDays, dist, drawPaths, runMonteCarlo, type McMode, type McResult } from '../core/montecarlo'
-import { clampPeriod } from '../core/registry'
-import type { AccountRules } from '../core/prop'
+import { dist, type McMode, type McResult } from '../core/montecarlo'
 import type { Period } from '../core/types'
 import { fmtDate, num2, pct, ratio, usd } from '../format'
-import { daysFor, shortLegLabel, type Item } from '../model'
+import { metricsFor, shortLegLabel, type Item } from '../model'
+import { d0, dpu, mcFor, n1, poolFor, range, rates, type McSettings } from '../mc'
+import { Optimizer } from './Optimizer'
 import { library } from '../core/registry'
 import { usePersistent } from '../store'
 import { SimSetup } from './SimSetup'
@@ -19,44 +19,7 @@ interface Props {
   acc: AccountRulesState
 }
 
-interface McSettings {
-  n: number
-  mode: McMode
-  seed: number
-}
-
-const pathCache = new Map<string, number[][]>()
-/** Ziehungen gecacht nach Pool-Länge/Einstellungen: gleiche Datenbasis = identische synthetische Jahre */
-function pathsFor(poolLen: number, cfg: McSettings): number[][] {
-  const key = `${poolLen}|${cfg.n}|${cfg.mode}|${cfg.seed}`
-  let p = pathCache.get(key)
-  if (!p) {
-    p = drawPaths(poolLen, cfg.n, cfg.mode, cfg.seed)
-    pathCache.set(key, p)
-  }
-  return p
-}
-
-/** Pool = Werktage im gewählten Zeitraum, beschränkt auf den Datenbereich des Algos/Stacks */
-function poolFor(item: Item, period: Period): string[] {
-  const p = clampPeriod(item.legs, period)
-  return p ? businessDays(p.from, p.to) : []
-}
-
-function mcFor(item: Item, period: Period, cfg: McSettings, rules: AccountRules): McResult {
-  const pool = poolFor(item, period)
-  const byDay = new Map(daysFor(item.legs).map((d) => [d.day, d]))
-  return runMonteCarlo(byDay, pool, pool.length ? pathsFor(pool.length, cfg) : [], rules)
-}
-
 const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }
-const range = (a: number, b: number, f: (n: number) => string) => `${f(a)} – ${f(b)}`
-const d0 = (n: number) => `${Math.round(n)} T`
-/** Tage pro Freischaltung – sehr seltene Freischaltungen nicht als absurde Zahl anzeigen */
-const dpu = (n: number | null) => (n === null ? '–' : n > 730 ? '> 2 Jahre' : d0(n))
-const n1 = (n: number) => num2(n).replace(/,00$/, '')
-const rates = (r: McResult) =>
-  `${r.evalPassRate === null ? '–' : pct(r.evalPassRate)} → ${r.fundedSuccessRate === null ? '–' : pct(r.fundedSuccessRate)}`
 
 export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   const [cfg, setCfg] = usePersistent<McSettings>('qps.mc', { n: 500, mode: 'bootstrap', seed: 1 })
@@ -71,9 +34,13 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
   const variant = useMemo<Item | null>(() => {
     const legs = item.legs.map((l) => ({ ...l, qty: qtyOv[l.strategyId] ?? l.qty }))
     if (legs.every((l, i) => l.qty === item.legs[i].qty) || !legs.some((l) => l.qty > 0)) return null
-    return { ...item, key: item.key + ':mod', name: item.name + ' (angepasst)', legs: legs.filter((l) => l.qty > 0) }
+    return { ...item, key: item.key + ':mod', name: item.name + ' (angepasst)', legs }
   }, [item, qtyOv])
   const active = variant ?? item
+  // historische Kennzahlen (gewählter Zeitraum) für Original und Anpassung
+  const histBase = useMemo(() => metricsFor(item.legs, period), [item, period])
+  const histActive = useMemo(() => (variant ? metricsFor(variant.legs, period) : histBase), [variant, histBase, period])
+  const currentQty = item.legs.map((l) => qtyOv[l.strategyId] ?? l.qty)
 
   const baseMc = useMemo(() => mcFor(item, period, cfg, rules), [item, period, cfg, rules])
   const mc = useMemo(() => (variant ? mcFor(variant, period, cfg, rules) : baseMc), [variant, baseMc, period, cfg, rules])
@@ -165,6 +132,28 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
             )
           })}
         </div>
+        <div className="kpis compact-kpis">
+          {[
+            { label: 'Ø Gewinn / Monat', a: histActive.avgMonthly, b: histBase.avgMonthly, f: usd, better: 1 },
+            { label: 'Max DD', a: histActive.maxDrawdown, b: histBase.maxDrawdown, f: usd, better: -1 },
+            { label: 'Faktor (Monat / DD)', a: histActive.monthlyToDD, b: histBase.monthlyToDD, f: ratio, better: 1 },
+          ].map(({ label, a, b, f, better }) => (
+            <div key={label} className={'kpi' + (label.startsWith('Faktor') ? ' highlight' : '')}>
+              <span>{label}</span>
+              <b>{f(a)}</b>
+              <small>
+                {variant ? (
+                  <>
+                    Original {f(b)}{' '}
+                    {a !== b && <em className={(a - b) * better > 0 ? 'pos' : 'neg'}>({a > b ? '+' : '−'}{f(Math.abs(a - b))})</em>}
+                  </>
+                ) : (
+                  `historisch, ${fmtDate(histBase.period.from)} – ${fmtDate(histBase.period.to)}`
+                )}
+              </small>
+            </div>
+          ))}
+        </div>
         {variant && (
           <div className="table-wrap">
             <table className="grid compact">
@@ -187,7 +176,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
                 ].map(({ label, it, r }) => (
                   <tr key={label}>
                     <td className="left name">{label}</td>
-                    <td className="left muted">{it.legs.map(shortLegLabel).join(' + ')}</td>
+                    <td className="left muted">{it.legs.filter((l) => l.qty > 0).map(shortLegLabel).join(' + ')}</td>
                     <td className="key">{n1(r.unlocks.mean)}</td>
                     <td>{dpu(r.daysPerUnlock)}</td>
                     <td>{r.costPerUnlock === null ? '–' : usd(r.costPerUnlock)}</td>
@@ -201,6 +190,20 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
           </div>
         )}
       </div>
+
+      <Optimizer
+        key={item.key}
+        item={item}
+        period={period}
+        cfg={cfg}
+        rules={rules}
+        current={currentQty}
+        currentDD={histActive.maxDrawdown}
+        onApply={(qty) => {
+          setOv({ key: item.key, qty: Object.fromEntries(item.legs.map((l, i) => [l.strategyId, qty[i]])) })
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+      />
 
       {!mc.paths.length && (
         <div className="card">
@@ -323,7 +326,7 @@ export function MonteCarlo({ items, period, item, setItemKey, acc }: Props) {
               {compare.map(({ it, r }) => (
                 <tr key={it.key} className={'clickable' + (it.key === item.key ? ' selected' : '')} onClick={() => setItemKey(it.key)}>
                   <td className="left name">{it.name}</td>
-                  <td className="left muted">{it.legs.map(shortLegLabel).join(' + ')}</td>
+                  <td className="left muted">{it.legs.filter((l) => l.qty > 0).map(shortLegLabel).join(' + ')}</td>
                   <td className="key">{n1(r.unlocks.mean)}</td>
                   <td>{range(r.unlocks.p10, r.unlocks.p90, n1)}</td>
                   <td>{pct(r.pAnyUnlock)}</td>
